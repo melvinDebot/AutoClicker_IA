@@ -2,7 +2,7 @@
 // through the ports (page, vision, store, clock), so the whole flow is tested with a fake Instagram.
 import type { DomEl, ListRow, PageState } from '@/recognition/page';
 import { DOM, TEXT, TIMING, VISUAL } from '@/recognition/rules';
-import { textMatches, usernameMatches } from '@/recognition/text';
+import { textMatches, usernameMatches, usernamePrefixMatches } from '@/recognition/text';
 import type { Highlight, Ports, Progress, RowTag, RunContext, RunOutcome, ScanResult, Step, UserResult } from './ports';
 import type { Box, PostResult, StoryResult } from './types';
 
@@ -294,7 +294,10 @@ export class Engine {
       const prof = await this.waitProfile(u);
 
       this.emit('classify_profile', 'Analyse du profil');
-      const profCheck = await this.confirmSettled({ x: 0, y: 0, w: prof.viewport.w, h: prof.viewport.h * 0.25 }, (t) => usernameMatches(t, u));
+      const profCheck = await this.confirmSettled(
+        { x: 0, y: 0, w: prof.viewport.w, h: prof.viewport.h * 0.25 },
+        (t) => usernameMatches(t, u) || usernamePrefixMatches(t, u),
+      );
       if (!profCheck.ok) {
         throw new Stop('paused', `Le profil affiché ne semble pas être @${u} (capture${readText(profCheck.read, ' : ')}).`);
       }

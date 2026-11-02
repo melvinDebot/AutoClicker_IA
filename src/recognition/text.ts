@@ -82,6 +82,24 @@ export function usernameMatches(ocrText: string, username: string): boolean {
   return b.length >= 6 && levenshtein(bare(ocrText), b) <= (b.length >= 12 ? 1 : 0);
 }
 
+/**
+ * Truncated header ("son | _of_" for "son____of_____god"): the OCR text, without separators,
+ * is the start of the username and covers at least 60 % of it. Only used to confirm a profile
+ * page whose username already comes from the URL.
+ */
+export function usernamePrefixMatches(ocrText: string, username: string): boolean {
+  const bare = (s: string) =>
+    normalizeText(s)
+      .replace(/^@/, '')
+      .replace(/[il|1]/g, 'l')
+      .replace(/[_.\s<>…]/g, '')
+      .replace(/0/g, 'o')
+      .replace(/9/g, 'g');
+  const o = bare(ocrText);
+  const u = bare(username);
+  return o.length >= Math.max(4, Math.ceil(u.length * 0.6)) && u.startsWith(o);
+}
+
 /** "12,1K" → 12100, "1 634" → 1634, "1,2 M" → 1200000. Null when unreadable. */
 export function parseCount(raw: string): number | null {
   const m = normalizeText(raw)

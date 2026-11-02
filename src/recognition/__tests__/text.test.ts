@@ -1,5 +1,5 @@
 import { TEXT } from '../rules';
-import { levenshtein, normalizeText, parseCount, textMatches, textStartsLike, usernameMatches } from '../text';
+import { levenshtein, normalizeText, parseCount, textMatches, textStartsLike, usernameMatches, usernamePrefixMatches } from '../text';
 
 describe('OCR-tolerant text matching (misreads seen on the screenshots)', () => {
   it('normalizes accents, dotless i and quotes', () => {
@@ -11,6 +11,12 @@ describe('OCR-tolerant text matching (misreads seen on the screenshots)', () => 
   it('accepts names whose underscores OCR dropped (seen: "son | of | 90d")', () => {
     expect(usernameMatches('sonof90d', 'son____of_____god')).toBe(true);
     expect(usernameMatches('sonofman', 'son____of_____god')).toBe(false);
+  });
+
+  it('confirms a truncated profile header by its start (seen: "< | son | _of_")', () => {
+    expect(usernamePrefixMatches('<son_of_', 'son____of_____god')).toBe(true);
+    expect(usernamePrefixMatches('so', 'son____of_____god')).toBe(false);
+    expect(usernamePrefixMatches('sonofman', 'son____of_____god')).toBe(false);
   });
 
   it('accepts double underscores merged by OCR (seen on the simulator)', () => {
