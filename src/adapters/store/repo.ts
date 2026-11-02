@@ -20,6 +20,7 @@ const summaryColumns = {
   discoveredCount: sessions.discoveredCount,
   listEndReached: sessions.listEndReached,
   rulesVersion: sessions.rulesVersion,
+  settingsJson: sessions.settingsJson,
   processed: processedCount,
   likesStory: storyLikes,
   likesPost: postLikes,
