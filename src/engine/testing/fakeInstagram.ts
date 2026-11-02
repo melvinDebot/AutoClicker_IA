@@ -313,6 +313,11 @@ export class FakeInstagram implements PagePort, VisionPort {
     return true;
   }
 
+  rowTags: (import('../ports').RowTag[] | null)[] = [];
+  tagRows(tags: import('../ports').RowTag[] | null): void {
+    this.rowTags.push(tags);
+  }
+
   highlight(h: Highlight): void {
     this.highlights.push(h);
   }

@@ -1,5 +1,5 @@
 // Real PagePort: the inspection, tap and scroll scripts injected on demand through the RPC.
-import type { Highlight, PagePort } from '@/engine/ports';
+import type { Highlight, PagePort, RowTag } from '@/engine/ports';
 import { diagnoseRowScript, inspectScript, pageScrollScript, revealHeartScript, scrollScript, tapScript, type RawPage } from '@/recognition/domScript';
 import type { PageState, TapResult } from '@/recognition/page';
 import { canInject, parseInstagramUrl } from '@/recognition/url';
@@ -30,6 +30,7 @@ export function createPagePort(opts: {
   currentUrl: () => string;
   goBack: () => void;
   onHighlight: (h: Highlight) => void;
+  onRowTags: (tags: RowTag[] | null) => void;
 }): PagePort {
   return {
     async inspect() {
@@ -53,5 +54,6 @@ export function createPagePort(opts: {
     revealHeart: () => opts.rpc.call<boolean>(revealHeartScript(), 4000),
     diagnoseRow: __DEV__ ? (u) => opts.rpc.call<unknown>(diagnoseRowScript(u), 4000) : undefined,
     highlight: (h) => opts.onHighlight(h),
+    tagRows: (tags) => opts.onRowTags(tags),
   };
 }

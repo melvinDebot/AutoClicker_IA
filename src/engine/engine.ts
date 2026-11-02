@@ -3,7 +3,7 @@
 import type { DomEl, ListRow, PageState } from '@/recognition/page';
 import { DOM, TEXT, TIMING, VISUAL } from '@/recognition/rules';
 import { textMatches, usernameMatches } from '@/recognition/text';
-import type { Highlight, Ports, Progress, RunContext, RunOutcome, ScanResult, Step, UserResult } from './ports';
+import type { Highlight, Ports, Progress, RowTag, RunContext, RunOutcome, ScanResult, Step, UserResult } from './ports';
 import type { Box, PostResult, StoryResult } from './types';
 
 /** Ends a run: `done` (end of the list) or `paused` (everything else, resumable). */
@@ -130,6 +130,7 @@ export class Engine {
           : { status: 'paused', reason: `Erreur inattendue : ${e instanceof Error ? e.message : String(e)}` };
     } finally {
       this.p.page.highlight(null);
+      this.p.page.tagRows(null);
       await this.returnToList(outcome);
       const now = clock.now();
       await store.updateSession(
@@ -170,6 +171,7 @@ export class Engine {
       await this.register(rows);
 
       const next = rows.find((r) => this.known.get(r.username) === 'todo');
+      this.tagRows(rows, next);
       for (const r of rows) {
         if (r === next) break;
         if (this.known.get(r.username) !== 'todo') this.catchUp.add(r.username);
@@ -184,6 +186,7 @@ export class Engine {
 
       // Every visible account is handled: load the next ones.
       rows.forEach((r) => this.catchUp.add(r.username));
+      this.p.page.tagRows(null);
       this.emit('scroll', 'Défilement vers la suite de la liste');
       const after = await this.scrollAndWait(s);
       this.windowIndex += 1;
@@ -284,6 +287,7 @@ export class Engine {
       this.mark(row.box, `@${u}`, 'target');
       this.emit('open_profile', `Ouverture de @${u}`);
       await this.tapOrStop(row.link, `ligne de @${u}`);
+      this.p.page.tagRows(null);
       const prof = await this.waitProfile(u);
 
       this.emit('classify_profile', 'Analyse du profil');
@@ -698,6 +702,18 @@ export class Engine {
     const n = this.catchUp.size;
     if (!n || this.processedThisRun > 0) return '';
     return `Rattrapage : ${n} compte${n > 1 ? 's' : ''} déjà traité${n > 1 ? 's' : ''} ignoré${n > 1 ? 's' : ''} · `;
+  }
+
+  /** Tags of the visible rows, from what the engine already knows (no extra inspection). */
+  private tagRows(rows: ListRow[], next: ListRow | undefined) {
+    const tags: RowTag[] = rows.map((r) => {
+      const st = this.known.get(r.username);
+      if (r === next) return { box: r.link.box, label: 'Suivant', tone: 'next' };
+      if (st === 'done') return { box: r.link.box, label: 'Traité', tone: 'done' };
+      if (st === 'error') return { box: r.link.box, label: 'Erreur', tone: 'error' };
+      return { box: r.link.box, label: 'À traiter', tone: 'todo' };
+    });
+    this.p.page.tagRows(tags);
   }
 
   private mark(box: Box | null, label = '', tone: NonNullable<Highlight>['tone'] = 'target') {

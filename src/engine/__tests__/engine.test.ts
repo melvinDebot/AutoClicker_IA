@@ -59,6 +59,16 @@ describe('Engine — full run', () => {
     expect(ig.highlights.some((h) => h?.tone === 'dry')).toBe(true);
   });
 
+  it('tags the visible rows: next, to do, done', async () => {
+    const { ig } = await run(users(9), {}, { postsPerUser: 0, likeStory: false });
+    const first = ig.rowTags.find((t) => t && t.length > 0)!;
+    expect(first[0]!.label).toBe('Suivant');
+    expect(first.slice(1).every((t) => t.label === 'À traiter')).toBe(true);
+    const later = ig.rowTags.filter((t): t is NonNullable<typeof t> => !!t && t.length > 0)[3]!;
+    expect(later.filter((t) => t.label === 'Traité').length).toBe(3);
+    expect(ig.rowTags[ig.rowTags.length - 1]).toBeNull(); // hidden at the end
+  });
+
   it('respects the settings: no story, zero post', async () => {
     const { ig, results } = await run(users(3), {}, { likeStory: false, postsPerUser: 0 });
     expect(ig.likesSent).toBe(0);

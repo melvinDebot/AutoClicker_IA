@@ -5,6 +5,9 @@ import type { Box, PostResult, Privacy, Settings, StoryResult, TextBlock } from 
 
 export type Highlight = { box: Box; label: string; tone: 'target' | 'dry' | 'done' } | null;
 
+/** State tag drawn next to a visible row of the list during a run (data already known, no extra work). */
+export type RowTag = { box: Box; label: string; tone: 'todo' | 'done' | 'next' | 'error' };
+
 export interface PagePort {
   inspect(): Promise<PageState>;
   /** Re-checks the element at its point (elementFromPoint) before the tap. */
@@ -20,6 +23,8 @@ export interface PagePort {
   diagnoseRow?(username: string): Promise<unknown>;
   /** Shows what the engine is about to touch (or would touch, in dry run). */
   highlight(h: Highlight): void;
+  /** Tags the visible rows (to do / done / next); null hides them (not on the list). */
+  tagRows(tags: RowTag[] | null): void;
 }
 
 export type SnapshotRef = { uri: string; width: number; height: number; scale: number };

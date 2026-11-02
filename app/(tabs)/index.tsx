@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { findResumable, getSession } from '@/adapters/store/sessionStore';
 import { createPagePort } from '@/adapters/webview/pagePort';
 import { WebViewRpc } from '@/adapters/webview/rpc';
-import type { Highlight } from '@/engine/ports';
+import type { Highlight, RowTag } from '@/engine/ports';
 import { dumpScript, type DomDump } from '@/recognition/debugScripts';
 import { START_URL } from '@/recognition/rules';
 import { parseInstagramUrl, type ParsedUrl } from '@/recognition/url';
@@ -20,6 +20,7 @@ import { Icon, type IconName } from '@/ui/Icon';
 import { HighlightLayer } from '@/ui/run/HighlightLayer';
 import { LockedOverlay } from '@/ui/run/LockedOverlay';
 import { RecapSheet } from '@/ui/run/RecapSheet';
+import { RowTagsLayer } from '@/ui/run/RowTagsLayer';
 import { ScanCard } from '@/ui/run/ScanCard';
 import { SummarySheet } from '@/ui/run/SummarySheet';
 import { useRunner } from '@/ui/run/useRunner';
@@ -54,6 +55,7 @@ export default function HomeScreen() {
   const [full, setFull] = useState(false);
   const [locked, setLocked] = useState(false);
   const [highlight, setHighlight] = useState<Highlight>(null);
+  const [rowTags, setRowTags] = useState<RowTag[] | null>(null);
   const [resumable, setResumable] = useState<Resumable>(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const [dump, setDump] = useState<DomDump | null>(null);
@@ -80,6 +82,7 @@ export default function HomeScreen() {
         currentUrl: () => urlRef.current,
         goBack: () => webRef.current?.goBack(),
         onHighlight: setHighlight,
+        onRowTags: setRowTags,
       }),
     [rpc],
   );
@@ -202,6 +205,7 @@ export default function HomeScreen() {
           overlay={
             <>
               {debugOpen && dump ? <DomOverlay elements={dump.elements} selectedId={selectedId} /> : null}
+              {busy ? <RowTagsLayer tags={rowTags} /> : null}
               {busy ? <HighlightLayer h={highlight} /> : null}
             </>
           }
