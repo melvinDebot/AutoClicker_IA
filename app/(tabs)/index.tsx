@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getSettings } from '@/adapters/settings';
 import { findResumable, getSession } from '@/adapters/store/sessionStore';
 import { createPagePort } from '@/adapters/webview/pagePort';
 import { WebViewRpc } from '@/adapters/webview/rpc';
@@ -129,7 +130,16 @@ export default function HomeScreen() {
       return;
     }
     findResumable(parsed.username)
-      .then((s) => setResumable(s ? { processed: 0, discovered: s.discoveredCount } : null))
+      .then((s) => {
+        // Same rule as the summary: a dry-run session is not resumable for real, and vice versa.
+        let dry = true;
+        try {
+          dry = s ? JSON.parse(s.settingsJson).dryRun !== false : true;
+        } catch {
+          // keep default
+        }
+        setResumable(s && dry === getSettings().dryRun ? { processed: 0, discovered: s.discoveredCount } : null);
+      })
       .catch(() => setResumable(null));
   }, [parsed.kind, parsed.username, phase.name]);
 
