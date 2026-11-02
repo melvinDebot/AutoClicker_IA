@@ -91,6 +91,8 @@ const styles = StyleSheet.create({
   base: { overflow: 'visible' },
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16 },
   glow: {
+    // Solid colour under the gradient: lets iOS compute the shadow efficiently.
+    backgroundColor: colors.primary,
     shadowColor: colors.primary,
     shadowOpacity: 0.38,
     shadowRadius: 14,
