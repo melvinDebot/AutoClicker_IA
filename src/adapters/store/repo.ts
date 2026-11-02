@@ -4,10 +4,13 @@ import { dayKey } from '@/engine/stats';
 import { db } from './db';
 import { dailyCounters, events, sessions, sessionUsers } from './schema';
 
-const processedCount = sql<number>`(select count(*) from ${sessionUsers} su where su.session_id = ${sessions.id} and su.state in ('done', 'error'))`;
-const storyLikes = sql<number>`(select count(*) from ${sessionUsers} su where su.session_id = ${sessions.id} and su.story_result = 'liked')`;
-const postLikes = sql<number>`(select count(*) from ${sessionUsers} su, json_each(coalesce(su.posts_result_json, '[]')) j where su.session_id = ${sessions.id} and j.value = 'liked')`;
-const privateCount = sql<number>`(select count(*) from ${sessionUsers} su where su.session_id = ${sessions.id} and su.state = 'done' and su.privacy = 'private')`;
+// Correlated subqueries: the session id is written fully qualified. An unqualified "id" would bind to
+// json_each's own "id" column inside the posts subquery and always count 0 (seen with real likes).
+const SID = sql.raw('"sessions"."id"');
+const processedCount = sql<number>`(select count(*) from ${sessionUsers} su where su.session_id = ${SID} and su.state in ('done', 'error'))`;
+const storyLikes = sql<number>`(select count(*) from ${sessionUsers} su where su.session_id = ${SID} and su.story_result = 'liked')`;
+const postLikes = sql<number>`(select count(*) from ${sessionUsers} su, json_each(coalesce(su.posts_result_json, '[]')) j where su.session_id = ${SID} and j.value = 'liked')`;
+const privateCount = sql<number>`(select count(*) from ${sessionUsers} su where su.session_id = ${SID} and su.state = 'done' and su.privacy = 'private')`;
 
 const summaryColumns = {
   id: sessions.id,
