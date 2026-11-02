@@ -288,6 +288,7 @@ export class Engine {
       this.emit('open_profile', `Ouverture de @${u}`);
       await this.tapOrStop(row.link, `ligne de @${u}`);
       this.p.page.tagRows(null);
+      this.mark(null); // the row highlight must not stay over the profile page
       const prof = await this.waitProfile(u);
 
       this.emit('classify_profile', 'Analyse du profil');

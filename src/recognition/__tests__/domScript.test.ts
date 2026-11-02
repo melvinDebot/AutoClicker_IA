@@ -86,6 +86,19 @@ describe('inspectScript', () => {
     expect(p.back?.target).toBe('back_button');
   });
 
+  it('ignores a big sticky wrapper around the back button (would hide every row)', () => {
+    const p = page(
+      '/egliseicc_paris/followers/',
+      `<div style="position: sticky" data-r="0 0 364 700"><button data-r="16 10 24 24"><svg aria-label="Back" data-r="16 10 24 24"></svg></button>
+         <h1 data-r="80 13 204 18">Followers</h1>
+         <main data-r="0 45 364 655">${row('kaji_dodi6', 101)}${row('gad_nathan', 161)}</main></div>`,
+    );
+    expect(p.list?.rows.map((r) => [r.username, r.fullyVisible])).toEqual([
+      ['kaji_dodi6', true],
+      ['gad_nathan', true],
+    ]);
+  });
+
   it('excludes the "Suggested for you" accounts below the followers', () => {
     const p = page(
       '/atelier.lumen/followers/',

@@ -172,7 +172,8 @@ if (seg[1] === 'followers' || titleEls.length) {
   // Rows live in <main>; links outside it (bottom tab bar with your own profile, header) are never followers.
   var mainEl = document.querySelector('main');
   var titleBottom = titleEls.length ? rectOf(titleEls[0]).y + rectOf(titleEls[0]).h : 0;
-  if (backs.length) { var topBar = fixedAncestor(backs[0]); if (topBar) { var tb0 = rectOf(topBar); if (tb0.y < vh / 2) titleBottom = Math.max(titleBottom, tb0.y + tb0.h); } }
+  // Only a thin bar counts (a big sticky wrapper would hide every row below it).
+  if (backs.length) { var topBar = fixedAncestor(backs[0]); if (topBar) { var tb0 = rectOf(topBar); if (tb0.y < vh / 2 && tb0.h < vh / 4) titleBottom = Math.max(titleBottom, tb0.y + tb0.h); } }
   var navs = document.querySelectorAll('nav,[role="navigation"],footer'), bottomLimit = vh;
   for (var i = 0; i < navs.length; i++) { var nb = rectOf(navs[i]); if (isVisible(navs[i], nb) && nb.y > vh / 2) bottomLimit = Math.min(bottomLimit, nb.y); }
   var anchors = document.querySelectorAll('a[href]');
@@ -185,7 +186,7 @@ if (seg[1] === 'followers' || titleEls.length) {
     var ab0 = rectOf(a);
     if ((mainEl && !mainEl.contains(a)) || a.closest('nav,footer,header,[role="navigation"],[role="tablist"]')) {
       var bar = fixedAncestor(a);
-      if (bar && isVisible(a, ab0)) { var bb = rectOf(bar); if (bb.y > vh / 2) bottomLimit = Math.min(bottomLimit, bb.y); }
+      if (bar && isVisible(a, ab0)) { var bb = rectOf(bar); if (bb.y > vh / 2 && bb.h < vh / 4) bottomLimit = Math.min(bottomLimit, bb.y); }
       continue;
     }
     if (R.reserved.indexOf(u.toLowerCase()) >= 0 || u.toLowerCase() === target) continue;
