@@ -39,6 +39,14 @@ function isVisible(el, b) {
   var cs = window.getComputedStyle(el);
   return cs.visibility !== 'hidden' && cs.display !== 'none' && (cs.opacity === '' || Number(cs.opacity) > 0.05);
 }
+// Fixed or sticky bar holding an element (Instagram's bottom tab bar is a plain fixed div, not a <nav>).
+function fixedAncestor(el) {
+  for (var n = el, k = 0; n && n !== document.body && k < 10; n = n.parentElement, k++) {
+    var pos = window.getComputedStyle(n).position;
+    if (pos === 'fixed' || pos === 'sticky') return n;
+  }
+  return null;
+}
 function describe(n) { return n ? n.tagName.toLowerCase() + (n.getAttribute('aria-label') ? '[' + n.getAttribute('aria-label') + ']' : '') : 'none'; }
 `;
 
@@ -146,6 +154,12 @@ var titleEls = textEls(L.followersTitle, 30);
 if (seg[1] === 'followers' || titleEls.length) {
   var target = (seg[0] || '').toLowerCase();
   var users = {}, order = [];
+  // Rows live in <main>; links outside it (bottom tab bar with your own profile, header) are never followers.
+  var mainEl = document.querySelector('main');
+  var titleBottom = titleEls.length ? rectOf(titleEls[0]).y + rectOf(titleEls[0]).h : 0;
+  if (backs.length) { var topBar = fixedAncestor(backs[0]); if (topBar) { var tb0 = rectOf(topBar); if (tb0.y < vh / 2) titleBottom = Math.max(titleBottom, tb0.y + tb0.h); } }
+  var navs = document.querySelectorAll('nav,[role="navigation"],footer'), bottomLimit = vh;
+  for (var i = 0; i < navs.length; i++) { var nb = rectOf(navs[i]); if (isVisible(navs[i], nb) && nb.y > vh / 2) bottomLimit = Math.min(bottomLimit, nb.y); }
   var anchors = document.querySelectorAll('a[href]');
   for (var i = 0; i < anchors.length; i++) {
     var a = anchors[i], p;
@@ -153,17 +167,19 @@ if (seg[1] === 'followers' || titleEls.length) {
     var m = /^\\/([A-Za-z0-9._]{1,30})\\/?$/.exec(p);
     if (!m) continue;
     var u = m[1];
+    var ab0 = rectOf(a);
+    if ((mainEl && !mainEl.contains(a)) || a.closest('nav,footer,header,[role="navigation"],[role="tablist"]')) {
+      var bar = fixedAncestor(a);
+      if (bar && isVisible(a, ab0)) { var bb = rectOf(bar); if (bb.y > vh / 2) bottomLimit = Math.min(bottomLimit, bb.y); }
+      continue;
+    }
     if (R.reserved.indexOf(u.toLowerCase()) >= 0 || u.toLowerCase() === target) continue;
-    if (a.closest('nav,footer,header,[role="navigation"],[role="tablist"]')) continue;
-    if (!isVisible(a, rectOf(a))) continue;
+    if (!isVisible(a, ab0)) continue;
     if (!users[u]) { users[u] = []; order.push(u); }
     users[u].push(a);
   }
   var suggestedEls = textEls(L.suggested, 40);
   var suggestedTop = suggestedEls.length ? Math.min.apply(null, suggestedEls.map(function (e) { return rectOf(e).y; })) : Infinity;
-  var titleBottom = titleEls.length ? rectOf(titleEls[0]).y + rectOf(titleEls[0]).h : 0;
-  var navs = document.querySelectorAll('nav,[role="navigation"],footer'), bottomLimit = vh;
-  for (var i = 0; i < navs.length; i++) { var nb = rectOf(navs[i]); if (isVisible(navs[i], nb) && nb.y > vh / 2) bottomLimit = Math.min(bottomLimit, nb.y); }
   var rows = [], scroller = null;
   order.forEach(function (u) {
     var links = users[u], first = links[0], row = first;

@@ -58,6 +58,25 @@ describe('inspectScript', () => {
     expect(p.loading).toBe(false);
   });
 
+  it('real layout (iPhone dump): rows in <main>, own profile in the fixed bottom bar never taken as a follower', () => {
+    const p = page(
+      '/egliseicc_paris/followers/',
+      `<div style="position: sticky" data-r="0 0 364 45"><button data-r="16 10 24 24"><svg aria-label="Back" data-r="16 10 24 24"></svg></button>
+         <h1 data-r="80 13 204 18">Followers</h1></div>
+       <main data-r="0 45 364 834">
+         <input aria-label="Search input" data-r="16 53 332 32">
+         ${row('kaji_dodi6', 101)}${row('gad_nathan', 281)}${row('nzougounsomoto', 461)}
+       </main>
+       <div style="position: fixed" data-r="0 440 364 50">
+         <a href="/" data-r="20 441 48 48"><svg aria-label="Home" data-r="32 453 24 24"></svg></a>
+         <a href="/eli_app_fr/" data-r="295 441 48 48"><img alt="eli_app_fr's profile picture" data-r="307 453 24 24"></a>
+       </div>`,
+    );
+    expect(p.list?.rows.map((r) => r.username)).toEqual(['kaji_dodi6', 'gad_nathan', 'nzougounsomoto']);
+    expect(p.list?.rows.map((r) => r.fullyVisible)).toEqual([true, true, false]); // last row is under the tab bar
+    expect(p.back?.target).toBe('back_button');
+  });
+
   it('excludes the "Suggested for you" accounts below the followers', () => {
     const p = page(
       '/atelier.lumen/followers/',
