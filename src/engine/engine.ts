@@ -199,7 +199,9 @@ export class Engine {
         // End of the list only at the bottom (or at the suggestions), 2 times in a row. Scrolling
         // through already known accounts in the middle of the list is catch-up, not the end.
         const atBottom = (!!now && now.top + now.client >= now.height - 4) || !!after.list?.suggestedVisible;
-        const moved = !!before && !!now && Math.abs(now.top - before.top) > 2;
+        // A list that grew counts as progress: at the bottom of the loaded part, the scroll cannot
+        // move but makes Instagram load the next accounts below.
+        const moved = !!before && !!now && (Math.abs(now.top - before.top) > 2 || now.height > before.height + 2);
         if (!moved && !atBottom) {
           throw new Stop('paused', 'Le défilement de la liste n’a aucun effet : rien de nouveau chargé, fin de liste non confirmée.');
         }
