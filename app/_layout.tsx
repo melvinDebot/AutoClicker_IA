@@ -7,6 +7,7 @@ import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sa
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { StyleSheet, View } from 'react-native';
@@ -14,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import migrations from '../drizzle/migrations';
 import { db } from '@/adapters/store/db';
+import { markRunningAsInterrupted } from '@/adapters/store/sessionStore';
 import { Text, ToastProvider } from '@/ui/components';
 import { colors } from '@/ui/theme';
 
@@ -28,6 +30,11 @@ export default function RootLayout() {
     PlusJakartaSans_800ExtraBold,
   });
   const { success, error } = useMigrations(db, migrations);
+
+  // A session still "running" at launch: the app was closed or killed during a run.
+  useEffect(() => {
+    if (success) markRunningAsInterrupted().catch(() => {});
+  }, [success]);
 
   if (error) {
     return (

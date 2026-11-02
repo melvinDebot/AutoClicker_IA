@@ -14,9 +14,11 @@ function userLine(u: SessionUserRow): { sub: string; liked: boolean; icon: IconN
   if (u.state === 'error') return { sub: 'Erreur, compte ignoré', liked: false, icon: 'alert', color: colors.dangerText };
   if (u.privacy === 'private') return { sub: 'Compte privé · ignoré', liked: false, icon: 'lock', color: colors.textFaint };
   const posts = parsePostResults(u.postsResultJson).filter((r) => r === 'liked').length;
+  const simulated = parsePostResults(u.postsResultJson).filter((r) => r === 'skipped').length + (u.storyResult === 'skipped' ? 1 : 0);
   const parts = [
-    u.storyResult === 'liked' ? 'Story likée' : u.storyResult === 'none' ? 'Pas de story' : null,
+    u.storyResult === 'liked' ? 'Story likée' : u.storyResult === 'none' ? 'Pas de story' : u.storyResult === 'already' ? 'Story déjà likée' : null,
     posts ? `${posts} post${posts > 1 ? 's' : ''} liké${posts > 1 ? 's' : ''}` : null,
+    simulated ? `${simulated} like${simulated > 1 ? 's' : ''} simulé${simulated > 1 ? 's' : ''} (essai à blanc)` : null,
   ].filter(Boolean);
   const liked = u.storyResult === 'liked' || posts > 0;
   return { sub: parts.join(' · ') || 'Rien à liker', liked, icon: 'check', color: colors.successText };
@@ -43,9 +45,12 @@ export default function SessionDetail() {
       },
     ]);
 
-  const resume = () =>
-    // STUB (step 1): resume = rescan + summary + countdown, in step 3.
-    Alert.alert('Pas encore disponible', 'La reprise d’une session arrive avec le moteur, à l’étape 3.');
+  // Opens the followers list of the account on the Home tab; the user launches again
+  // (scan, summary, countdown) and the engine skips the accounts already handled.
+  const resume = () => {
+    router.back();
+    router.navigate({ pathname: '/', params: { resume: id } });
+  };
 
   const header = (
     <View style={styles.sheetHead}>
@@ -78,6 +83,13 @@ export default function SessionDetail() {
   const pct = progressPct(s.processed, s.discoveredCount);
   const tile = STATUS_TILE[s.status];
   const remaining = s.discoveredCount - s.processed;
+  const dryRun = (() => {
+    try {
+      return JSON.parse(s.settingsJson).dryRun !== false;
+    } catch {
+      return true;
+    }
+  })();
   const canResume = s.status === 'paused' || s.status === 'interrupted';
 
   return (
@@ -97,6 +109,13 @@ export default function SessionDetail() {
                 </Text>
                 <View style={styles.inlineWrap}>
                   <StatusChip status={s.status} />
+                  {dryRun ? (
+                    <View style={styles.dry}>
+                      <Text weight="bold" size={12} color={colors.warning}>
+                        Essai à blanc
+                      </Text>
+                    </View>
+                  ) : null}
                   <Text size={13} color={colors.textMuted} tabular>
                     {formatDateTime(s.createdAt)} · {formatDuration(s.elapsedMs)}
                   </Text>
@@ -206,6 +225,7 @@ const styles = StyleSheet.create({
   between: { flexDirection: 'row', justifyContent: 'space-between' },
   note: { marginTop: 10, marginHorizontal: 4, lineHeight: 19 },
   mt14: { marginTop: 14 },
+  dry: { height: 26, paddingHorizontal: 10, borderRadius: 999, justifyContent: 'center', backgroundColor: 'rgba(245,184,61,0.15)' },
   mt18: { marginTop: 18 },
   accRow: {
     flexDirection: 'row',
