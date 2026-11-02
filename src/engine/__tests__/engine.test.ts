@@ -158,6 +158,14 @@ describe('Engine — per account rules', () => {
     expect(results.user00!.result?.posts).toEqual(['liked']);
   });
 
+  it('continues when "back" from a post lands on the list (replaced history entry)', async () => {
+    const { outcome, results } = await run(users(3), { postBackSkipsProfileFor: 'user01' }, { postsPerUser: 2, likeStory: false });
+    expect(outcome.status).toBe('done');
+    expect(results.user01!.state).toBe('done');
+    expect(results.user01!.result?.posts).toEqual(['liked']); // second post skipped, nothing touched twice
+    expect(results.user02!.result?.posts).toEqual(['liked', 'liked']);
+  });
+
   it('closes a "Not now" window and continues', async () => {
     const { outcome, store } = await run(users(2), { dismissDialogOnce: true }, { postsPerUser: 0 });
     expect(outcome.status).toBe('done');

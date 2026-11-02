@@ -47,6 +47,8 @@ export type FakeOptions = {
   tilesBelowFold?: boolean;
   /** The post heart is below the image until revealed. */
   heartBelowFold?: boolean;
+  /** "Back" from a post of this account goes straight to the list (replaced history entry). */
+  postBackSkipsProfileFor?: string;
 };
 
 type Frame =
@@ -83,7 +85,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   taps: string[] = [];
   highlights: Highlight[] = [];
   private pending: string[] = [];
-  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold'>> &
+  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor'>> &
     FakeOptions;
 
   constructor(
@@ -259,7 +261,9 @@ export class FakeInstagram implements PagePort, VisionPort {
   }
 
   async back(): Promise<void> {
+    const leaving = this.frame;
     if (this.stack.length > 1) this.stack.pop();
+    if (leaving.kind === 'post' && leaving.u === this.o.postBackSkipsProfileFor && this.stack.length > 1) this.stack.pop();
     if (this.frame.kind === 'followers') this.pageScrolls = 0;
     if (this.frame.kind === 'followers' && this.o.reorderOnReturn) {
       // Instagram reorders the visible window when coming back.

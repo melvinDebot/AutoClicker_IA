@@ -216,6 +216,8 @@ export class Engine {
     this.current = u;
     this.pending = { story: 0, post: 0 };
     const result: UserResult = { state: 'done', privacy: 'unknown', story: null, posts: [] };
+    // Instagram sometimes replaces a history entry: "back" from a post can land on the list directly.
+    let onList = false;
 
     this.emit('pick_next_user', `${this.catchUpText()}suivant : @${u}`);
     // Visual confirmation of the row before opening it.
@@ -254,14 +256,20 @@ export class Engine {
           this.ctx.settings.postsPerUser > 0 && !pr.emptyNotice && pr.postsCount !== 0
             ? await this.revealTiles(u, Math.min(this.ctx.settings.postsPerUser, pr.postsCount ?? Number.POSITIVE_INFINITY))
             : [];
-        for (let k = 0; k < wanted.length; k++) result.posts.push(await this.handlePost(u, wanted[k]!, k));
+        for (let k = 0; k < wanted.length && !onList; k++) {
+          const r = await this.handlePost(u, wanted[k]!, k);
+          result.posts.push(r.result);
+          onList = r.onList;
+        }
         if (wanted.length === 0) this.emit('classify_profile', pr.emptyNotice ? 'Aucune publication' : 'Profil public');
       }
 
-      this.emit('back_to_list', 'Retour à la liste d’abonnés');
-      this.mark(null);
-      await page.back();
-      await this.sleep(TIMING.afterTap);
+      if (!onList) {
+        this.emit('back_to_list', 'Retour à la liste d’abonnés');
+        this.mark(null);
+        await page.back();
+        await this.sleep(TIMING.afterTap);
+      }
 
       await store.saveResult(sid, u, result, this.pending, clock.now());
       this.commitPending();
@@ -356,7 +364,7 @@ export class Engine {
     return null;
   }
 
-  private async handlePost(u: string, href: string, k: number): Promise<PostResult> {
+  private async handlePost(u: string, href: string, k: number): Promise<{ result: PostResult; onList: boolean }> {
     const tile = await this.tileOnScreen(u, href);
     if (!tile) throw new Stop('paused', `Publication ${k + 1} introuvable.`);
     this.mark(tile.box, `Publication ${k + 1}`, 'target');
@@ -375,8 +383,15 @@ export class Engine {
     this.emit('back', 'Retour au profil');
     this.mark(null);
     await this.p.page.back();
-    await this.waitProfile(u);
-    return res;
+    const after = await this.waitFor(
+      (s) => (s.kind === 'profile' && s.username?.toLowerCase() === u.toLowerCase()) || (!!s.list && s.list.rows.length > 0),
+      `profil de @${u}`,
+    );
+    if (after.list) {
+      await this.p.store.event(this.ctx.sessionId, 'back_landed_on_list', { username: u, post: k + 1 }, this.p.clock.now());
+      return { result: res, onList: true };
+    }
+    return { result: res, onList: false };
   }
 
   /** Likes an empty heart (never a filled one), or only highlights it in dry run. */
