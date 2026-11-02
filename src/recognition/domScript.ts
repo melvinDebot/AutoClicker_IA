@@ -47,6 +47,13 @@ function fixedAncestor(el) {
   }
   return null;
 }
+// True when the element's centre is really on top (not under a banner, a bar or a dialog).
+function uncoveredAt(el) {
+  if (typeof document.elementFromPoint !== 'function') return true;
+  var b = el.getBoundingClientRect();
+  var hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+  return !!hit && (hit === el || el.contains(hit) || hit.contains(el));
+}
 function describe(n) { return n ? n.tagName.toLowerCase() + (n.getAttribute('aria-label') ? '[' + n.getAttribute('aria-label') + ']' : '') : 'none'; }
 `;
 
@@ -266,7 +273,8 @@ if (seg.length === 1 && R.reserved.indexOf((seg[0] || '').toLowerCase()) < 0) {
   var tiles = [], tnodes = document.querySelectorAll('a[href*="/p/"],a[href*="/reel/"]');
   for (var i = 0; i < tnodes.length; i++) {
     var t = tnodes[i], tb = rectOf(t);
-    if (header.contains(t) || t.closest('[role="dialog"]') || tb.w < 60 || !isVisible(t, tb)) continue;
+    // Only tiles whose centre is free: one half under the "Use the app" banner cannot be touched.
+    if (header.contains(t) || t.closest('[role="dialog"]') || tb.w < 60 || !isVisible(t, tb) || !uncoveredAt(t)) continue;
     tiles.push(t);
   }
   tiles.sort(function (a, b) { var ra = rectOf(a), rb = rectOf(b); return (Math.round(ra.y) - Math.round(rb.y)) || (ra.x - rb.x); });

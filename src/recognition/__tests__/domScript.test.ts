@@ -156,6 +156,16 @@ describe('inspectScript', () => {
     ]);
   });
 
+  it('skips a post tile covered by the "Use the app" banner', () => {
+    const p = page(
+      '/user00/',
+      `<main data-r="0 45 364 905"><header data-r="0 45 364 190"><img alt="user00" data-r="16 87 77 77"></header>
+         <a href="/p/AAA/" data-r="0 250 120 120"></a><a href="/p/BBB/" data-r="0 380 120 120"></a></main>
+       <div style="position: fixed" data-r="0 392 364 30"><button data-r="114 396 134 18">Utiliser l’application</button></div>`,
+    );
+    expect(p.profile?.tiles.map((t) => t.href)).toEqual(['/p/AAA/']);
+  });
+
   it('reads a private profile', () => {
     const p = page(
       '/user01/',
