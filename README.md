@@ -6,19 +6,19 @@ App iPhone personnelle (Expo, dev build) : dans une WebView Instagram où vous �
 
 ## État
 
-Étape 1 (socle + spike) en cours. Voir [docs/spike.md](docs/spike.md).
+Étapes 1 à 4 codées. Rien n'est validé sur Instagram tant que la [checklist iPhone](docs/test-checklist.md) n'est pas faite.
 
 | Partie | État |
 |---|---|
-| Onglets, thème, Sessions, Détail, Réglages | Fait, données factices en dev |
+| Onglets, thème, Sessions, Détail, Réglages | Fait |
 | SQLite (Drizzle) + migrations, réglages (kv-store) | Fait |
-| Dev build | Compilé, installé et lancé sur l'iPhone 13 Pro le 02/11 (JS chargé sans erreur) |
-| WebView Instagram (cookies persistants, aucune injection sur les pages de connexion) | Écrit, **parcours pas encore testé sur iPhone** |
-| Module natif `vision-check` (capture WKWebView, effacement des données WebView) | Compilé, **pas encore testé sur iPhone** |
-| Écran de debug DOM | Écrit, **pas testé sur iPhone** |
-| Dataset de captures (9 captures de l'app iOS, annotées) + règles de textes OCR | Fait, testé sur les captures (Jest) |
-| Scan, récapitulatif, moteur, mode verrouillé | Étape 3 (« Lancer » et « Reprendre » sont des bouchons) |
-| OCR dans l'app, gabarits depuis la WebView, sélecteurs DOM dans `rules.ts` | Étape 2 |
+| Dev build | Compilé et lancé sur l'iPhone 13 Pro |
+| Module natif `vision-check` (capture, OCR, couleurs, empreintes) | Compilé, **pas testé sur iPhone** |
+| Règles DOM + script d'inspection | Testés dans un DOM simulé, **libellés à vérifier sur le vrai Instagram** (`0.3.0-dom-unverified`) |
+| Moteur (parcours, essai à blanc, plafonds, reprise, arrêts) | Testé avec un faux Instagram (Jest), **pas encore sur iPhone** |
+| Scan, récap, compte à rebours, mode verrouillé, résumé | Écrit, **pas encore essayé sur iPhone** |
+| Dataset de captures + règles de textes OCR | Fait, testé sur les captures |
+| Notification « session en pause » | Non faite (optionnelle ; `expo-notifications` retiré pour éviter l'autorisation push) |
 
 ## Prérequis
 
@@ -92,4 +92,10 @@ Garde-fous appliqués dans le code dès l'étape 1 : aucun user-agent modifié, 
 
 ## Quand Instagram change son interface
 
-À compléter à l'étape 2 : mise à jour de `src/recognition/rules.ts` (et de `RULES_VERSION`) et régénération des gabarits.
+Le repérage s'arrête (pause « élément introuvable ») au lieu de toucher au mauvais endroit. Pour corriger :
+
+1. Lancer le dev build, ouvrir l'écran concerné dans la WebView : le relevé du DOM part dans Metro (`[AC-DUMP] …`), ou via l'icône insecte › Analyser › Exporter.
+2. Repérer le nouveau libellé (`aria-label`, texte, forme du lien) et mettre à jour `DOM` ou `TEXT` dans `src/recognition/rules.ts`. Jamais de nom de classe CSS.
+3. Incrémenter `RULES_VERSION` (enregistrée avec chaque session).
+4. Si une icône a changé : debug › Capture, puis régénérer le gabarit dans `assets/templates/` et `templates.json`.
+5. `npm test` (le script d'inspection est testé dans `src/recognition/__tests__/domScript.test.ts`), puis un essai à blanc.
