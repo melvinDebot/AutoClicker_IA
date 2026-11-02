@@ -140,6 +140,18 @@ describe('Engine — per account rules', () => {
     expect(ig.user('user00').storyLiked).toBe(true); // liked once, during its own visit
   });
 
+  it('waits for a profile painted late before confirming it (page sliding in)', async () => {
+    const { outcome, results } = await run(users(2), { lateProfileSnapshots: 2 }, { postsPerUser: 0 });
+    expect(outcome.status).toBe('done');
+    expect(results.user00!.state).toBe('done');
+  });
+
+  it('scrolls the profile to reach posts below the header', async () => {
+    const { ig, results } = await run(users(2), { tilesBelowFold: true }, { postsPerUser: 2 });
+    expect(results.user00!.result?.posts).toEqual(['liked', 'liked']);
+    expect(ig.taps).toContain('tile:user00:1');
+  });
+
   it('closes a "Not now" window and continues', async () => {
     const { outcome, store } = await run(users(2), { dismissDialogOnce: true }, { postsPerUser: 0 });
     expect(outcome.status).toBe('done');
@@ -204,6 +216,17 @@ describe('Engine — stops', () => {
     expect(outcome).toEqual({ status: 'paused', reason: 'Arrêtée par vous' });
     expect(results.user00!.state).toBe('done');
     expect(results.user01!.state).toBe('todo');
+  });
+
+  it('goes back to the followers list after a pause in the middle of an account', async () => {
+    const { outcome, ig } = await run(users(3), { ignoreLikeTaps: true });
+    expect(outcome.status).toBe('paused');
+    expect(ig.stack).toEqual([{ kind: 'followers' }]);
+  });
+
+  it('stays where it is after an Instagram warning', async () => {
+    const { ig } = await run(users(10), { warningAfterLikes: 1 }, { postsPerUser: 2 });
+    expect(ig.stack.length).toBeGreaterThan(1);
   });
 
   it('background: paused with the right reason', async () => {

@@ -12,6 +12,8 @@ export interface PagePort {
   /** History back (WebView). */
   back(): Promise<void>;
   scrollList(dy: number): Promise<void>;
+  /** Scrolls the page itself (profile grid below the header). */
+  scrollPage(dy: number): Promise<void>;
   /** Shows what the engine is about to touch (or would touch, in dry run). */
   highlight(h: Highlight): void;
 }

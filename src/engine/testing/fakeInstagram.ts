@@ -41,6 +41,10 @@ export type FakeOptions = {
   ocrLiesFor?: string;
   /** Opening this account's story shows another account's story. */
   storyAdvancesFor?: string;
+  /** The profile is painted late: the first N snapshots of a profile show nothing. */
+  lateProfileSnapshots?: number;
+  /** Post tiles are below the fold until the profile is scrolled once. */
+  tilesBelowFold?: boolean;
 };
 
 type Frame =
@@ -77,7 +81,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   taps: string[] = [];
   highlights: Highlight[] = [];
   private pending: string[] = [];
-  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor'>> &
+  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold'>> &
     FakeOptions;
 
   constructor(
@@ -178,7 +182,7 @@ export class FakeInstagram implements PagePort, VisionPort {
           emptyNotice: !u.private && !(u.posts ?? []).length,
           avatar: el(`ring:${f.u}`, 'avatar_story', { x: 16, y: 80, w: 90, h: 90 }),
           storyRing: !!u.story && !u.private,
-          tiles: u.private ? [] : (u.posts ?? []).map((_, k) => el(`tile:${f.u}:${k}`, 'post_tile', { x: (k % 3) * 130, y: 420 + Math.floor(k / 3) * 130, w: 128, h: 128 })),
+          tiles: u.private || (this.o.tilesBelowFold && this.pageScrolls === 0) ? [] : (u.posts ?? []).map((_, k) => el(`tile:${f.u}:${k}`, 'post_tile', { x: (k % 3) * 130, y: 420 + Math.floor(k / 3) * 130, w: 128, h: 128 }, { href: `/p/${f.u}-${k}/` })),
         },
       };
     }
@@ -249,6 +253,7 @@ export class FakeInstagram implements PagePort, VisionPort {
 
   async back(): Promise<void> {
     if (this.stack.length > 1) this.stack.pop();
+    if (this.frame.kind === 'followers') this.pageScrolls = 0;
     if (this.frame.kind === 'followers' && this.o.reorderOnReturn) {
       // Instagram reorders the visible window when coming back.
       const start = this.scrollTop;
@@ -266,6 +271,11 @@ export class FakeInstagram implements PagePort, VisionPort {
     const next = this.scrollTop + this.o.pageSize;
     if (next + this.o.pageSize > this.order.length && this.pending.length) this.loadingTicks = 2;
     this.scrollTop = Math.min(next, Math.max(0, this.order.length + (this.pending.length ? this.o.loadStep : 0) - this.o.pageSize));
+  }
+
+  pageScrolls = 0;
+  async scrollPage(): Promise<void> {
+    this.pageScrolls += 1;
   }
 
   highlight(h: Highlight): void {
@@ -291,6 +301,7 @@ export class FakeInstagram implements PagePort, VisionPort {
       blocks.push({ text: r.username === this.o.ocrLiesFor ? 'someone.else' : r.username, confidence: 1, box: r.link.box }),
     );
     if (st.list?.title) blocks.push({ text: 'Followers', confidence: 1, box: st.list.title.box });
+    if (st.profile && this.o.lateProfileSnapshots && this.lateLeft() > 0) return [];
     if (st.profile) {
       blocks.push({ text: st.profile.username, confidence: 1, box: { x: 120, y: 20, w: 150, h: 24 } });
       if (st.profile.privateNotice) blocks.push({ text: 'This account is private', confidence: 1, box: st.profile.privateNotice.box });
@@ -307,6 +318,12 @@ export class FakeInstagram implements PagePort, VisionPort {
     if (annulus) return st.profile?.storyRing ? { ...none, saturated: 0.6 } : none;
     const liked = st.story?.liked ?? st.post?.liked ?? false;
     return liked ? { ...none, red: 0.4 } : none;
+  }
+
+  private late = 0;
+  private lateLeft() {
+    this.late += 1;
+    return (this.o.lateProfileSnapshots ?? 0) - this.late + 1;
   }
 
   /** Same view as inspect(), without side effects on counters or loading. */

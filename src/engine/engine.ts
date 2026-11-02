@@ -109,6 +109,7 @@ export class Engine {
           : { status: 'paused', reason: `Erreur inattendue : ${e instanceof Error ? e.message : String(e)}` };
     } finally {
       this.p.page.highlight(null);
+      await this.returnToList(outcome);
       const now = clock.now();
       await store.updateSession(
         sid,
@@ -204,7 +205,7 @@ export class Engine {
 
     this.emit('pick_next_user', `${this.catchUpText()}suivant : @${u}`);
     // Visual confirmation of the row before opening it.
-    if (!(await this.confirmText(row.link.box, (t) => usernameMatches(t, u)))) {
+    if (!(await this.confirmSettled(row.link.box, (t) => usernameMatches(t, u)))) {
       throw new Stop('paused', `Le nom lu sur la capture ne correspond pas au DOM (@${u}).`);
     }
     await store.markProcessing(sid, u);
@@ -217,14 +218,14 @@ export class Engine {
       const prof = await this.waitProfile(u);
 
       this.emit('classify_profile', 'Analyse du profil');
-      if (!(await this.confirmText({ x: 0, y: 0, w: prof.viewport.w, h: prof.viewport.h * 0.25 }, (t) => usernameMatches(t, u)))) {
+      if (!(await this.confirmSettled({ x: 0, y: 0, w: prof.viewport.w, h: prof.viewport.h * 0.25 }, (t) => usernameMatches(t, u)))) {
         throw new Stop('paused', `Le profil affiché ne semble pas être @${u} (capture).`);
       }
       const pr = prof.profile;
       if (!pr) throw new Stop('paused', 'Profil illisible.');
 
       if (pr.privateNotice) {
-        if (!(await this.confirmText(pr.privateNotice.box, (t) => textMatches(t, TEXT.privateNotice)))) {
+        if (!(await this.confirmSettled(pr.privateNotice.box, (t) => textMatches(t, TEXT.privateNotice)))) {
           throw new Stop('paused', 'Compte privé selon le DOM mais pas selon la capture.');
         }
         result.privacy = 'private';
@@ -232,9 +233,9 @@ export class Engine {
       } else {
         result.privacy = 'public';
         result.story = await this.handleStory(u, prof);
-        const n = Math.min(this.ctx.settings.postsPerUser, pr.tiles.length);
-        for (let k = 0; k < n; k++) result.posts.push(await this.handlePost(u, k));
-        if (n === 0) this.emit('classify_profile', pr.emptyNotice ? 'Aucune publication' : 'Profil public');
+        const wanted = this.ctx.settings.postsPerUser > 0 && !pr.emptyNotice ? await this.revealTiles(u, this.ctx.settings.postsPerUser) : [];
+        for (let k = 0; k < wanted.length; k++) result.posts.push(await this.handlePost(u, wanted[k]!, k));
+        if (wanted.length === 0) this.emit('classify_profile', pr.emptyNotice ? 'Aucune publication' : 'Profil public');
       }
 
       this.emit('back_to_list', 'Retour à la liste d’abonnés');
@@ -307,9 +308,36 @@ export class Engine {
     await this.waitProfile(u);
   }
 
-  private async handlePost(u: string, k: number): Promise<PostResult> {
-    const prof = await this.waitProfile(u);
-    const tile = prof.profile?.tiles[k];
+  /**
+   * The profile header often fills the screen: scrolls the profile until the first posts are
+   * visible. Posts are then identified by their link (the grid moves when scrolling).
+   */
+  private async revealTiles(u: string, n: number): Promise<string[]> {
+    let s = await this.waitProfile(u);
+    for (let i = 0; i < 3 && (s.profile?.tiles.length ?? 0) < n; i++) {
+      this.emit('classify_profile', 'Défilement vers les publications');
+      await this.p.page.scrollPage(Math.round(s.viewport.h * 0.6));
+      await this.sleep(TIMING.afterScroll);
+      s = await this.waitProfile(u);
+    }
+    return (s.profile?.tiles ?? []).slice(0, n).map((t) => t.href ?? t.id);
+  }
+
+  /** Waits until the post with this link is visible on the profile, scrolling if needed. */
+  private async tileOnScreen(u: string, href: string) {
+    let s = await this.waitProfile(u);
+    for (let i = 0; i < 4; i++) {
+      const tile = s.profile?.tiles.find((t) => (t.href ?? t.id) === href);
+      if (tile) return tile;
+      await this.p.page.scrollPage(Math.round(s.viewport.h * 0.5));
+      await this.sleep(TIMING.afterScroll);
+      s = await this.waitProfile(u);
+    }
+    return null;
+  }
+
+  private async handlePost(u: string, href: string, k: number): Promise<PostResult> {
+    const tile = await this.tileOnScreen(u, href);
     if (!tile) throw new Stop('paused', `Publication ${k + 1} introuvable.`);
     this.mark(tile.box, `Publication ${k + 1}`, 'target');
     this.emit('open_post', `Ouverture de la publication ${k + 1}`);
@@ -369,6 +397,26 @@ export class Engine {
 
   // ---------------------------------------------------------------- helpers
 
+  /**
+   * After a pause in the middle of an account, goes back to the followers list (at most 3 history
+   * steps) so that "Reprendre" works at once. Never after an Instagram warning, a sign-in request
+   * or a move to the background (JavaScript is suspended there).
+   */
+  private async returnToList(outcome: RunOutcome): Promise<void> {
+    if (outcome.status !== 'paused') return;
+    if (/Avertissement|connexion ou une vérification|arrière-plan/.test(outcome.reason)) return;
+    try {
+      for (let i = 0; i < 3; i++) {
+        const s = await this.p.page.inspect();
+        if (s.kind === 'followers' || s.warning || s.kind === 'login' || s.kind === 'account_check') return;
+        await this.p.page.back();
+        await this.p.clock.sleep(TIMING.afterScroll);
+      }
+    } catch {
+      // best effort only
+    }
+  }
+
   private async waitProfile(u: string): Promise<PageState> {
     return this.waitFor((s) => s.kind === 'profile' && s.username?.toLowerCase() === u.toLowerCase() && !!s.profile, `profil de @${u}`);
   }
@@ -424,6 +472,18 @@ export class Engine {
       const why = r.reason === 'covered' ? `masqué par ${r.hit ?? 'un autre élément'}` : r.reason === 'stale' ? 'plus dans la page' : 'hors de l’écran';
       throw new Stop('paused', `Impossible de toucher ${what} : ${why}.`);
     }
+  }
+
+  /**
+   * Same as confirmText, read again a few times: Instagram slides new pages in, so the first
+   * snapshot can be taken before the page is painted. Still a disagreement after that → false.
+   */
+  private async confirmSettled(box: Box, ok: (text: string) => boolean): Promise<boolean> {
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) await this.sleep(TIMING.settle);
+      if (await this.confirmText(box, ok)) return true;
+    }
+    return false;
   }
 
   /** OCR of a region on a fresh snapshot. Without the vision module (dry run only): accepted. */

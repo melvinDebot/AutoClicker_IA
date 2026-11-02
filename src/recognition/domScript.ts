@@ -292,6 +292,14 @@ hit.dispatchEvent(new MouseEvent('click', base));
 return { ok: true };`;
 }
 
+/** Scrolls the page itself (profile), not the followers list container. */
+export function pageScrollScript(dy: number): string {
+  return `
+var se = document.scrollingElement || document.documentElement;
+se.scrollBy({ top: ${Math.round(dy)}, behavior: 'auto' });
+return se.scrollTop;`;
+}
+
 /** Scrolls the followers list container found by the last inspection. */
 export function scrollScript(dy: number): string {
   return `

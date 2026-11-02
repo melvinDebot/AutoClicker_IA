@@ -109,8 +109,13 @@ export function useRunner(deps: { page: PagePort; getViewTag: () => number | nul
           settings: plan.settings,
           previousElapsedMs: plan.previousElapsedMs,
           signal: controller.signal,
-          onProgress: setProgress,
+          onProgress: (p) => {
+            // DEVELOPMENT ONLY: follow the run in the Metro console.
+            if (__DEV__) console.log(`[AC-RUN] ${p.step} · ${p.username ?? '-'} · ${p.text} · ${p.processed}/${p.discovered}`);
+            setProgress(p);
+          },
         });
+        if (__DEV__) console.log(`[AC-RUN] END ${outcome.status} · ${outcome.reason}`);
       } finally {
         deactivateKeepAwake(KEEP_AWAKE_TAG);
         deps.onLockChange(false);

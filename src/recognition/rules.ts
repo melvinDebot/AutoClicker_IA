@@ -3,7 +3,7 @@
 // (Instagram iOS app, English, dark mode). DOM selectors and aria-labels come
 // from the debug screen on the iPhone (step 2).
 
-export const RULES_VERSION = '0.3.2-dom-partly-verified';
+export const RULES_VERSION = '0.3.3-dom-partly-verified';
 export const TEMPLATES_VERSION = '0.1.0-app-ios';
 
 /**
@@ -104,7 +104,8 @@ export const DOM = {
   like: ['Like', 'J’aime', "J'aime"],
   unlike: ['Unlike', 'Je n’aime plus', "Je n'aime plus"],
   close: ['Close', 'Fermer'],
-  back: ['Back', 'Retour'],
+  // SEEN on the iPhone: "Back" (en), "Précédent" (fr) on the followers page.
+  back: ['Back', 'Précédent', 'Retour'],
   loading: ['Loading...', 'Loading…', 'Loading', 'Chargement...', 'Chargement…', 'Chargement'],
   // Title of the followers page / dialog.
   followersTitle: ['Followers', 'Abonnés', 'Abonné(e)s'],
@@ -133,4 +134,6 @@ export const TIMING = {
   loadingTimeout: 15000,
   afterTap: 700,
   afterScroll: 900,
+  /** Between two snapshot readings while a page slides in. */
+  settle: 600,
 } as const;
