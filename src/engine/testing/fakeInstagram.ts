@@ -55,6 +55,8 @@ export type FakeOptions = {
   splitProfileNameFor?: string;
   /** Scrolling the list has no effect (wrong container). */
   brokenScroll?: boolean;
+  /** Instagram puts the list back at the top every time the engine comes back to it. */
+  resetScrollOnReturn?: boolean;
 };
 
 type Frame =
@@ -91,7 +93,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   taps: string[] = [];
   highlights: Highlight[] = [];
   private pending: string[] = [];
-  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor' | 'ocrGarbageUntilScrollFor' | 'brokenScroll'>> &
+  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor' | 'ocrGarbageUntilScrollFor' | 'brokenScroll' | 'resetScrollOnReturn'>> &
     FakeOptions;
 
   constructor(
@@ -171,7 +173,7 @@ export class FakeInstagram implements PagePort, VisionPort {
           title: el('title', 'followers_list', { x: 140, y: 60, w: 110, h: 24 }, { text: 'followers' }),
           rows,
           suggestedVisible: false,
-          scroll: { top: this.scrollTop * ROW_H, height: this.order.length * ROW_H, client: VH },
+          scroll: { top: this.scrollTop * ROW_H, height: this.order.length * ROW_H, client: this.o.pageSize * ROW_H },
         },
       };
     }
@@ -270,7 +272,10 @@ export class FakeInstagram implements PagePort, VisionPort {
     const leaving = this.frame;
     if (this.stack.length > 1) this.stack.pop();
     if (leaving.kind === 'post' && leaving.u === this.o.postBackSkipsProfileFor && this.stack.length > 1) this.stack.pop();
-    if (this.frame.kind === 'followers') this.pageScrolls = 0;
+    if (this.frame.kind === 'followers') {
+      this.pageScrolls = 0;
+      if (this.o.resetScrollOnReturn) this.scrollTop = 0;
+    }
     if (this.frame.kind === 'followers' && this.o.reorderOnReturn) {
       // Instagram reorders the visible window when coming back.
       const start = this.scrollTop;
@@ -280,9 +285,14 @@ export class FakeInstagram implements PagePort, VisionPort {
   }
 
   private garbageScrolls = 0;
-  async scrollList(): Promise<void> {
+  async scrollList(dy?: number): Promise<void> {
     this.scrolls += 1;
     if (this.o.brokenScroll) return;
+    if (dy !== undefined && dy % ROW_H === 0 && dy !== Math.round(VH * 0.8)) {
+      // Exact restore of a previous position (multiple of a row).
+      this.scrollTop = Math.max(0, Math.min(this.scrollTop + dy / ROW_H, Math.max(0, this.order.length - this.o.pageSize)));
+      return;
+    }
     if (this.o.stuckLoadingAtScroll !== undefined && this.scrolls >= this.o.stuckLoadingAtScroll) {
       this.loadingTicks = Number.POSITIVE_INFINITY;
       return;

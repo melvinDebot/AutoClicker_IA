@@ -83,6 +83,12 @@ describe('Engine — discovered list', () => {
     expect(Math.max(...discovered)).toBe(30);
   });
 
+  it('list back at the top after each profile: goes back to its position, never "done" too early', async () => {
+    const { outcome, results } = await run(users(40), { resetScrollOnReturn: true, initialLoaded: 14, loadStep: 14 }, { postsPerUser: 0, likeStory: false });
+    expect(outcome).toEqual({ status: 'done', reason: 'Fin de la liste' });
+    expect(Object.values(results).filter((r) => r.state === 'done')).toHaveLength(40);
+  });
+
   it('ends after two scrolls without any new account', async () => {
     const { outcome, ig } = await run(users(7), {}, { postsPerUser: 0, likeStory: false });
     expect(outcome).toEqual({ status: 'done', reason: 'Fin de la liste' });

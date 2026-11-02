@@ -149,9 +149,20 @@ export class Engine {
 
   private async loop(): Promise<void> {
     let emptyScrolls = 0;
+    let scrollsWithoutNew = 0;
+    let lastTop = 0;
     for (;;) {
       this.checkpoint();
-      const s = await this.waitFor((st) => !!st.list && st.list.rows.length > 0, 'liste d’abonnés');
+      let s = await this.waitFor((st) => !!st.list && st.list.rows.length > 0, 'liste d’abonnés');
+      // Instagram puts the list back at the top after each profile: go back to where we were.
+      const top = s.list?.scroll.top ?? 0;
+      if (lastTop > 0 && top < 5) {
+        this.emit('scroll', 'Retour à la position dans la liste');
+        await this.p.page.scrollList(lastTop - top);
+        await this.sleep(TIMING.afterScroll);
+        s = await this.waitFor((st) => !!st.list && st.list.rows.length > 0, 'liste d’abonnés');
+      }
+      lastTop = 0;
       if (s.username && s.username.toLowerCase() !== this.ctx.targetAccount.toLowerCase()) {
         throw new Stop('paused', `La liste affichée n’est pas celle de @${this.ctx.targetAccount}.`);
       }
@@ -165,6 +176,8 @@ export class Engine {
       }
       if (next) {
         emptyScrolls = 0;
+        scrollsWithoutNew = 0;
+        lastTop = s.list?.scroll.top ?? 0;
         await this.processUser(next);
         continue;
       }
@@ -180,18 +193,25 @@ export class Engine {
       const now = after.list?.scroll;
       await this.p.store.event(this.ctx.sessionId, 'scroll', { before, after: now, fresh: fresh.length }, this.p.clock.now());
       if (fresh.length === 0 && !after.loading) {
-        // End of the list only when really at the bottom (or at the suggestions). A scroll that did
-        // not move without being at the bottom is a broken scroll: pause, never "done".
-        const atBottom = !!now && now.top + now.client >= now.height - 4;
+        // End of the list only at the bottom (or at the suggestions), 2 times in a row. Scrolling
+        // through already known accounts in the middle of the list is catch-up, not the end.
+        const atBottom = (!!now && now.top + now.client >= now.height - 4) || !!after.list?.suggestedVisible;
         const moved = !!before && !!now && Math.abs(now.top - before.top) > 2;
-        if (!moved && !atBottom && !after.list?.suggestedVisible) {
+        if (!moved && !atBottom) {
           throw new Stop('paused', 'Le défilement de la liste n’a aucun effet : rien de nouveau chargé, fin de liste non confirmée.');
         }
-        emptyScrolls += 1;
-        await this.p.store.event(this.ctx.sessionId, 'scroll_empty', { emptyScrolls }, this.p.clock.now());
-        if (emptyScrolls >= 2) throw new Stop('done', 'Fin de la liste');
+        scrollsWithoutNew += 1;
+        if (scrollsWithoutNew > 60) throw new Stop('paused', 'La liste défile sans fin sans nouveau compte.');
+        if (atBottom) {
+          emptyScrolls += 1;
+          await this.p.store.event(this.ctx.sessionId, 'scroll_empty', { emptyScrolls }, this.p.clock.now());
+          if (emptyScrolls >= 2) throw new Stop('done', 'Fin de la liste');
+        } else {
+          emptyScrolls = 0;
+        }
       } else {
         emptyScrolls = 0;
+        scrollsWithoutNew = 0;
       }
     }
   }
