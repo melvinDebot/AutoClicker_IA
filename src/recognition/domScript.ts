@@ -15,6 +15,7 @@ function config() {
     loading: DOM.loading,
     followersTitle: DOM.followersTitle,
     dismiss: DOM.dismiss,
+    storyPrefix: DOM.storyPrefix,
     minHeart: DOM.minHeartPx,
     privateNotice: TEXT.privateNotice,
     noPosts: TEXT.noPosts,
@@ -46,7 +47,7 @@ export function inspectScript(): string {
   return `
 var R = ${JSON.stringify(config())};
 ${HELPERS}
-var L = {}; ['like','unlike','close','back','loading','followersTitle','dismiss','privateNotice','noPosts','suggested','warning']
+var L = {}; ['like','unlike','close','back','loading','followersTitle','dismiss','privateNotice','noPosts','suggested','warning','storyPrefix']
   .forEach(function (k) { L[k] = R[k].map(norm); });
 function reg1(el, target, box) {
   var b = box || rectOf(el);
@@ -92,6 +93,20 @@ function heart() {
   if (!pick) return { like: null, liked: null };
   var liked = pick === unlikeEl;
   return { like: reg1(clickable(pick), liked ? 'like_filled' : 'like_empty', rectOf(pick)), liked: liked };
+}
+// Avatar button with a story: aria-label "Story by <user>, not seen" (seen on the iPhone).
+function storyButton(root, user) {
+  var nodes = root.querySelectorAll('[role="button"][aria-label],button[aria-label],a[aria-label]');
+  for (var i = 0; i < nodes.length; i++) {
+    var lab = norm(nodes[i].getAttribute('aria-label'));
+    for (var j = 0; j < L.storyPrefix.length; j++) {
+      var pre = L.storyPrefix[j] + ' '; // norm() trims the trailing space of the prefix
+      if (lab.indexOf(user ? pre + user.toLowerCase() : pre) === 0) {
+        if (isVisible(nodes[i], rectOf(nodes[i]))) return nodes[i];
+      }
+    }
+  }
+  return null;
 }
 function containsText(el, list) { var t = norm(el.innerText || el.textContent); return list.filter(function (w) { return t.indexOf(w) >= 0; })[0] || null; }
 
@@ -168,7 +183,9 @@ if (seg[1] === 'followers' || titleEls.length) {
       var cb = rectOf(canvases[c]);
       if (cb.x <= ab.x + ab.w / 2 && cb.x + cb.w >= ab.x + ab.w / 2 && cb.y <= ab.y + ab.h / 2 && cb.y + cb.h >= ab.y + ab.h / 2) ring = true;
     }
-    if (ring && canvases[0]) ab = rectOf(canvases[0]);
+    var sb = storyButton(row, u);
+    if (sb) { ring = true; ab = rectOf(sb); }
+    else if (ring && canvases[0]) ab = rectOf(canvases[0]);
     rows.push({ username: u, link: reg1(nameLink, 'user_row'), box: rb, avatar: ab, storyRing: ring,
       fullyVisible: rb.y >= titleBottom - 1 && rb.y + rb.h <= bottomLimit + 1 });
     if (!scroller) {
@@ -201,6 +218,8 @@ if (seg.length === 1 && R.reserved.indexOf((seg[0] || '').toLowerCase()) < 0) {
       if (cb2.x <= ab2.x + ab2.w / 2 && cb2.x + cb2.w >= ab2.x + ab2.w / 2 && cb2.y <= ab2.y + ab2.h / 2 && cb2.y + cb2.h >= ab2.y + ab2.h / 2) { storyRing = true; ringBox = cb2; }
     }
   }
+  var profileStory = storyButton(header, seg[0]);
+  if (profileStory) { storyRing = true; ringBox = rectOf(profileStory); }
   var priv = textEls(L.privateNotice, 60);
   var tiles = [], tnodes = document.querySelectorAll('a[href*="/p/"],a[href*="/reel/"]');
   for (var i = 0; i < tnodes.length; i++) {
@@ -211,7 +230,7 @@ if (seg.length === 1 && R.reserved.indexOf((seg[0] || '').toLowerCase()) < 0) {
   tiles.sort(function (a, b) { var ra = rectOf(a), rb = rectOf(b); return (Math.round(ra.y) - Math.round(rb.y)) || (ra.x - rb.x); });
   profile = { username: seg[0], privateNotice: priv.length ? reg1(priv[0], 'private_notice') : null,
     emptyNotice: textEls(L.noPosts, 40).length > 0,
-    avatar: avatarImg ? reg1(clickable(avatarImg), 'avatar_story', ringBox || rectOf(avatarImg)) : null,
+    avatar: profileStory ? reg1(profileStory, 'avatar_story') : avatarImg ? reg1(clickable(avatarImg), 'avatar_story', ringBox || rectOf(avatarImg)) : null,
     storyRing: storyRing,
     tiles: tiles.slice(0, 12).map(function (t) { var e = reg1(t, 'post_tile'); e.href = new URL(t.getAttribute('href'), location.href).pathname; return e; }) };
 }

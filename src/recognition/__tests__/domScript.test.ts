@@ -80,6 +80,22 @@ describe('inspectScript', () => {
     expect(p.profile?.tiles.map((t) => t.href)).toEqual(['/p/AAA/', '/p/BBB/', '/reel/CCC/']);
   });
 
+  it('detects a story from the avatar button label seen on the iPhone ("Story by <user>, not seen")', () => {
+    const p = page(
+      '/user00/',
+      `<header data-r="0 0 390 300"><div role="button" aria-label="Story by user00, not seen" data-r="16 80 90 90"><img alt="user00's profile picture" data-r="20 84 82 82"></div></header>`,
+    );
+    expect(p.profile?.storyRing).toBe(true);
+    expect(p.profile?.avatar?.box).toEqual({ x: 16, y: 80, w: 90, h: 90 });
+    const list = page(
+      '/atelier.lumen/followers/',
+      `<span data-r="150 18 90 24">Followers</span>
+       <div data-r="0 120 390 64"><div role="button" aria-label="Story by user01, not seen" data-r="12 128 48 48"><img alt="" data-r="14 130 44 44"></div>
+         <a href="/user01/" data-r="70 132 120 18">user01</a></div>`,
+    );
+    expect(list.list?.rows[0]).toMatchObject({ username: 'user01', storyRing: true });
+  });
+
   it('reads a private profile', () => {
     const p = page(
       '/user01/',

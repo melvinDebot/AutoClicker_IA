@@ -3,7 +3,7 @@
 // (Instagram iOS app, English, dark mode). DOM selectors and aria-labels come
 // from the debug screen on the iPhone (step 2).
 
-export const RULES_VERSION = '0.3.0-dom-unverified';
+export const RULES_VERSION = '0.3.1-dom-partly-verified';
 export const TEMPLATES_VERSION = '0.1.0-app-ios';
 
 /**
@@ -112,6 +112,9 @@ export const DOM = {
   dismiss: ['Not Now', 'Not now', 'Pas maintenant', 'Plus tard'],
   // Minimum size of a like heart: comment hearts are smaller and must be ignored.
   minHeartPx: 20,
+  // SEEN on the iPhone (2026-11-02, feed): avatar button aria-label "Story by <user>, not seen".
+  storyPrefix: ['Story by ', 'Story de ', 'Story of '],
+  storyNotSeen: [', not seen', ', non vue'],
 } as const;
 
 /** Thresholds of the visual confirmation (colorStats on the snapshot). */
