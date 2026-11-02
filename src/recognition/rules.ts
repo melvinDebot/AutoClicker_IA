@@ -3,7 +3,7 @@
 // (Instagram iOS app, English, dark mode). DOM selectors and aria-labels come
 // from the debug screen on the iPhone (step 2).
 
-export const RULES_VERSION = '0.2.0-dataset';
+export const RULES_VERSION = '0.3.0-dom-unverified';
 export const TEMPLATES_VERSION = '0.1.0-app-ios';
 
 /**
@@ -94,3 +94,40 @@ export const RESERVED_SEGMENTS = new Set([
   'your_activity',
   'notifications',
 ]);
+
+/**
+ * DOM rules (Instagram web in the WebView). Roles, aria-labels, visible texts and link
+ * shapes only — never generated CSS class names. TO VERIFY on the iPhone (DOM dumps).
+ */
+export const DOM = {
+  // aria-label of the heart <svg> (or of its button); "Unlike" when already liked.
+  like: ['Like', 'J’aime', "J'aime"],
+  unlike: ['Unlike', 'Je n’aime plus', "Je n'aime plus"],
+  close: ['Close', 'Fermer'],
+  back: ['Back', 'Retour'],
+  loading: ['Loading...', 'Loading…', 'Loading', 'Chargement...', 'Chargement…', 'Chargement'],
+  // Title of the followers page / dialog.
+  followersTitle: ['Followers', 'Abonnés', 'Abonné(e)s'],
+  // Buttons that safely close an overlay (never anything else).
+  dismiss: ['Not Now', 'Not now', 'Pas maintenant', 'Plus tard'],
+  // Minimum size of a like heart: comment hearts are smaller and must be ignored.
+  minHeartPx: 20,
+} as const;
+
+/** Thresholds of the visual confirmation (colorStats on the snapshot). */
+export const VISUAL = {
+  /** Share of red pixels in the heart box above which the heart is "filled". */
+  heartRedFilled: 0.08,
+  /** Story ring around an avatar: saturated (unseen, gradient) or grey (seen). */
+  ringSaturated: 0.15,
+  ringGrey: 0.3,
+} as const;
+
+/** Engine timings (ms). Plain waits for screens, no randomised "human" delays. */
+export const TIMING = {
+  poll: 350,
+  screenTimeout: 9000,
+  loadingTimeout: 15000,
+  afterTap: 700,
+  afterScroll: 900,
+} as const;

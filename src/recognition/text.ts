@@ -55,11 +55,12 @@ export function textStartsLike(text: string, candidates: readonly string[]): boo
 
 /**
  * Username confirmation only: the exact value always comes from the DOM link.
- * Folds the look-alikes OCR confuses (i/l/1/I/|, o/0).
+ * Folds the letters OCR confuses (i/l/I/|, dotless ı); digits stay distinct so that
+ * user00 never confirms user01. One more misread is tolerated from 10 characters.
  */
 export function usernameMatches(ocrText: string, username: string): boolean {
-  const fold = (s: string) => normalizeText(s).replace(/^@/, '').replace(/[il1|]/g, 'l').replace(/0/g, 'o');
-  return levenshtein(fold(ocrText), fold(username)) <= (username.length >= 8 ? 2 : 1);
+  const fold = (s: string) => normalizeText(s).replace(/^@/, '').replace(/[il|]/g, 'l');
+  return levenshtein(fold(ocrText), fold(username)) <= (username.length >= 10 ? 1 : 0);
 }
 
 /** "12,1K" → 12100, "1 634" → 1634, "1,2 M" → 1200000. Null when unreadable. */

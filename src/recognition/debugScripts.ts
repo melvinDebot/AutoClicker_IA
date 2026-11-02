@@ -38,7 +38,7 @@ for (var i = 0; i < nodes.length; i++) {
   var r = el.getBoundingClientRect();
   if (r.width < 1 || r.height < 1) continue;
   var cs = window.getComputedStyle(el);
-  var visible = cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0 &&
+  var visible = cs.visibility !== 'hidden' && cs.display !== 'none' && (cs.opacity === '' || Number(cs.opacity) > 0) &&
     r.bottom > 0 && r.right > 0 && r.top < vh && r.left < vw;
   if (${onlyVisible ? 'true' : 'false'} && !visible) continue;
   if (out.length >= MAX) { truncated = true; break; }
