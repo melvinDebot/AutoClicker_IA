@@ -58,9 +58,9 @@ export class Engine {
     }
     const rows = s?.list?.rows.length ?? 0;
     const checks = [
-      { label: s?.list ? `Liste d’abonnés${s.username ? ` de @${s.username}` : ''} reconnue` : 'Recherche d’une liste d’abonnés', ok: !!s?.list },
-      { label: `${rows} compte${rows > 1 ? 's' : ''} visible${rows > 1 ? 's' : ''} repéré${rows > 1 ? 's' : ''}`, ok: rows > 0 },
-      { label: 'Bouton retour repéré', ok: !!s?.back },
+      { label: s?.list ? `Liste d’abonnés${s.username ? ` de @${s.username}` : ''} reconnue` : 'Aucune liste d’abonnés à l’écran', ok: !!s?.list },
+      { label: rows ? `${rows} compte${rows > 1 ? 's' : ''} visible${rows > 1 ? 's' : ''} repéré${rows > 1 ? 's' : ''}` : 'Aucun compte visible', ok: rows > 0 },
+      { label: s?.back ? 'Bouton retour repéré' : 'Bouton retour introuvable', ok: !!s?.back },
     ];
     if (!s) return { ok: false, message: 'La page ne répond pas. Rechargez-la puis réessayez.', checks };
     if (s.warning) return { ok: false, message: `Avertissement d’Instagram à l’écran : « ${s.warning} ».`, checks };
