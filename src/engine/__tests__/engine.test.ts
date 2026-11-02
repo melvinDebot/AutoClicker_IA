@@ -166,6 +166,13 @@ describe('Engine — per account rules', () => {
     expect(results.user02!.result?.posts).toEqual(['liked', 'liked']);
   });
 
+  it('confirms a long profile name read in two pieces', async () => {
+    const list: FakeUser[] = [{ username: 'talk_to_me__l__god_talk_to_me', posts: [] }, { username: 'user01', posts: [] }];
+    const { outcome, results } = await run(list, { splitProfileNameFor: 'talk_to_me__l__god_talk_to_me' }, { postsPerUser: 0, likeStory: false });
+    expect(outcome.status).toBe('done');
+    expect(results['talk_to_me__l__god_talk_to_me']!.state).toBe('done');
+  });
+
   it('closes a "Not now" window and continues', async () => {
     const { outcome, store } = await run(users(2), { dismissDialogOnce: true }, { postsPerUser: 0 });
     expect(outcome.status).toBe('done');

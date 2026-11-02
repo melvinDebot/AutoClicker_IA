@@ -26,6 +26,13 @@ export const SCAN_FAIL = 'Ouvrez la liste des abonnés d’un compte dans la Web
 
 const AUTO_STOP_LABEL: Record<number, string> = { 15: '15 min', 30: '30 min', 60: '1 h' };
 
+/** OCR lines plus their joins: a long name wrapped or truncated is read in several pieces. */
+function withJoins(texts: string[]): string[] {
+  const t = texts.map((x) => x.trim()).filter(Boolean);
+  const pairs = t.slice(1).map((x, i) => `${t[i]}${x}`);
+  return [...t, ...pairs, t.join('')];
+}
+
 function pathOf(url: string): string {
   try {
     return new URL(url).pathname;
@@ -494,7 +501,7 @@ export class Engine {
         box = again.link.box;
       }
       const r = await this.ocrTexts(box);
-      if (r === null || r.some((t) => usernameMatches(t, row.username))) return { ok: true, read: r ?? [] };
+      if (r === null || withJoins(r).some((t) => usernameMatches(t, row.username))) return { ok: true, read: r ?? [] };
       read = r;
     }
     return { ok: false, read };
@@ -563,7 +570,7 @@ export class Engine {
       if (i > 0) await this.sleep(TIMING.settle);
       const r = await this.ocrTexts(box);
       read = r ?? [];
-      if (r === null || r.some(ok)) return { ok: true, read: r ?? [] };
+      if (r === null || withJoins(r).some(ok)) return { ok: true, read: r ?? [] };
     }
     return { ok: false, read };
   }

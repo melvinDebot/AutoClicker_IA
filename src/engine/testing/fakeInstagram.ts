@@ -49,6 +49,8 @@ export type FakeOptions = {
   heartBelowFold?: boolean;
   /** "Back" from a post of this account goes straight to the list (replaced history entry). */
   postBackSkipsProfileFor?: string;
+  /** The profile header of this account is read by OCR in two pieces (long name wrapped). */
+  splitProfileNameFor?: string;
 };
 
 type Frame =
@@ -85,7 +87,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   taps: string[] = [];
   highlights: Highlight[] = [];
   private pending: string[] = [];
-  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor'>> &
+  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor'>> &
     FakeOptions;
 
   constructor(
@@ -320,7 +322,14 @@ export class FakeInstagram implements PagePort, VisionPort {
     if (st.list?.title) blocks.push({ text: 'Followers', confidence: 1, box: st.list.title.box });
     if (st.profile && this.o.lateProfileSnapshots && this.lateLeft() > 0) return [];
     if (st.profile) {
-      blocks.push({ text: st.profile.username, confidence: 1, box: { x: 120, y: 20, w: 150, h: 24 } });
+      const name = st.profile.username;
+      if (name === this.o.splitProfileNameFor) {
+        blocks.push({ text: '<', confidence: 1, box: { x: 10, y: 20, w: 20, h: 24 } });
+        blocks.push({ text: name.slice(0, 11), confidence: 1, box: { x: 120, y: 20, w: 150, h: 24 } });
+        blocks.push({ text: name.slice(14).replace('__', '_'), confidence: 1, box: { x: 120, y: 46, w: 150, h: 24 } });
+      } else {
+        blocks.push({ text: name, confidence: 1, box: { x: 120, y: 20, w: 150, h: 24 } });
+      }
       if (st.profile.privateNotice) blocks.push({ text: 'This account is private', confidence: 1, box: st.profile.privateNotice.box });
     }
     if (!region) return blocks;
