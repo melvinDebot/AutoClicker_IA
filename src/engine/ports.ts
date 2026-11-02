@@ -6,7 +6,7 @@ import type { Box, PostResult, Privacy, Settings, StoryResult, TextBlock } from 
 export type Highlight = { box: Box; label: string; tone: 'target' | 'dry' | 'done' } | null;
 
 /** State tag drawn next to a visible row of the list during a run (data already known, no extra work). */
-export type RowTag = { box: Box; label: string; tone: 'todo' | 'done' | 'next' | 'error' };
+export type RowTag = { box: Box; label: string; tone: 'todo' | 'done' | 'next' | 'error' | 'skipped' };
 
 export interface PagePort {
   inspect(): Promise<PageState>;

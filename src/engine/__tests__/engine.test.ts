@@ -65,8 +65,18 @@ describe('Engine — full run', () => {
     expect(first[0]!.label).toBe('Suivant');
     expect(first.slice(1).every((t) => t.label === 'À traiter')).toBe(true);
     const later = ig.rowTags.filter((t): t is NonNullable<typeof t> => !!t && t.length > 0)[3]!;
-    expect(later.filter((t) => t.label === 'Traité').length).toBe(3);
+    expect(later.filter((t) => t.label === 'Ignoré').length).toBe(3); // nothing to like (0 post, no story)
     expect(ig.rowTags[ig.rowTags.length - 1]).toBeNull(); // hidden at the end
+  });
+
+  it('tags "Liké" only when a like was really sent, "Simulé" in dry run', async () => {
+    const real = await run(users(4), {}, { postsPerUser: 1, likeStory: false });
+    const realTags = real.ig.rowTags.filter((t): t is NonNullable<typeof t> => !!t && t.length > 0).pop()!;
+    expect(realTags.filter((t) => t.label === 'Liké').length).toBeGreaterThan(0);
+    const dry = await run(users(4), {}, { postsPerUser: 1, likeStory: false, dryRun: true });
+    const dryTags = dry.ig.rowTags.filter((t): t is NonNullable<typeof t> => !!t && t.length > 0).pop()!;
+    expect(dryTags.some((t) => t.label === 'Liké')).toBe(false);
+    expect(dryTags.filter((t) => t.label === 'Simulé').length).toBeGreaterThan(0);
   });
 
   it('respects the settings: no story, zero post', async () => {

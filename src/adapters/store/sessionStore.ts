@@ -26,7 +26,7 @@ export async function createSession(targetAccount: string, settings: Settings, n
   return id;
 }
 
-/** Latest session of this account that can be resumed (paused or interrupted). */
+/** Latest session of this account that can be resumed (paused or interrupted); the caller checks the mode. */
 export async function findResumable(targetAccount: string) {
   const rows = await db
     .select()

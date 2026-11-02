@@ -7,7 +7,8 @@ import { colors } from '../theme';
 const TONE = {
   next: { bg: colors.primary, fg: '#FFFFFF' },
   todo: { bg: 'rgba(99,82,245,0.85)', fg: '#FFFFFF' },
-  done: { bg: 'rgba(58,58,60,0.9)', fg: '#FFFFFF' },
+  done: { bg: '#14855E', fg: '#FFFFFF' },
+  skipped: { bg: 'rgba(58,58,60,0.9)', fg: '#FFFFFF' },
   error: { bg: colors.danger, fg: '#FFFFFF' },
 } as const;
 

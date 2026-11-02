@@ -54,6 +54,8 @@ function grow(b: Box, by: number): Box {
 export class Engine {
   private ctx!: RunContext;
   private known = new Map<string, 'todo' | 'processing' | 'done' | 'error'>();
+  /** What really happened to each account handled in this run (row tags). */
+  private outcomes = new Map<string, 'liked' | 'simulated' | 'skipped'>();
   private processed = 0;
   private discovered = 0;
   private windowIndex = 0;
@@ -333,12 +335,22 @@ export class Engine {
         await this.sleep(TIMING.afterTap);
       }
 
+      const likesSent = this.pending.story + this.pending.post;
       await store.saveResult(sid, u, result, this.pending, clock.now());
       this.commitPending();
       this.known.set(u, 'done');
       this.processed += 1;
       this.processedThisRun += 1;
-      this.emit('save', `Résultat enregistré pour @${u}`);
+      const simulated = result.story === 'skipped' && this.ctx.settings.dryRun ? 1 : result.posts.filter((p) => p === 'skipped').length;
+      this.outcomes.set(u, likesSent > 0 ? 'liked' : simulated > 0 ? 'simulated' : 'skipped');
+      this.emit(
+        'save',
+        likesSent > 0
+          ? `@${u} : ${likesSent} like${likesSent > 1 ? 's' : ''} envoyé${likesSent > 1 ? 's' : ''}`
+          : simulated > 0
+            ? `@${u} : essai à blanc, aucun like envoyé`
+            : `@${u} : rien à liker (${result.privacy === 'private' ? 'compte privé' : result.posts.includes('already') ? 'déjà liké' : 'aucune publication'})`,
+      );
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       if (this.pending.story + this.pending.post > 0) {
@@ -715,7 +727,13 @@ export class Engine {
     const tags: RowTag[] = rows.map((r) => {
       const st = this.known.get(r.username);
       if (r === next) return { box: r.link.box, label: 'Suivant', tone: 'next' };
-      if (st === 'done') return { box: r.link.box, label: 'Traité', tone: 'done' };
+      if (st === 'done') {
+        // "Liké" only when a like was really sent and confirmed (DOM + snapshot).
+        const o = this.outcomes.get(r.username);
+        if (o === 'liked') return { box: r.link.box, label: 'Liké', tone: 'done' };
+        if (o === 'simulated') return { box: r.link.box, label: 'Simulé', tone: 'skipped' };
+        return { box: r.link.box, label: o ? 'Ignoré' : 'Déjà vu', tone: 'skipped' };
+      }
       if (st === 'error') return { box: r.link.box, label: 'Erreur', tone: 'error' };
       return { box: r.link.box, label: 'À traiter', tone: 'todo' };
     });

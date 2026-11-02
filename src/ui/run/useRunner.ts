@@ -15,6 +15,14 @@ import type { Settings } from '@/engine/types';
 
 const KEEP_AWAKE_TAG = 'autoclicker-run';
 
+function sessionDryRun(settingsJson: string): boolean {
+  try {
+    return JSON.parse(settingsJson).dryRun !== false;
+  } catch {
+    return true;
+  }
+}
+
 export type Plan = {
   sessionId: string;
   targetAccount: string;
@@ -70,6 +78,8 @@ export function useRunner(deps: { page: PagePort; getViewTag: () => number | nul
       [r] = await Promise.all([engine.scan(), realClock.sleep(900)]);
       if (!r.ok) return fail(r.message, r.checks);
       [resumable, today] = await Promise.all([findResumable(r.targetAccount), likesToday()]);
+      // A dry-run session is never resumed for real (its accounts were not liked), and vice versa.
+      if (resumable && sessionDryRun(resumable.settingsJson) !== getSettings().dryRun) resumable = null;
     } catch (e) {
       // Any unexpected error ends the scan with a readable message instead of a spinner forever.
       return fail(`Erreur pendant l’analyse : ${e instanceof Error ? e.message : String(e)}`);
