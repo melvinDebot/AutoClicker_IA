@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 
 import { Icon, type IconName } from '@/ui/Icon';
-import { colors, fonts } from '@/ui/theme';
+import { colors, fonts, TAB_BAR_STYLE } from '@/ui/theme';
 
 const tabIcon =
   (name: IconName) =>
@@ -16,10 +16,7 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: {
-          backgroundColor: 'rgba(22,21,31,0.96)',
-          borderTopColor: 'rgba(255,255,255,0.06)',
-        },
+        tabBarStyle: TAB_BAR_STYLE,
         tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11.5 },
       }}
     >

@@ -63,3 +63,9 @@ export const radius = { sm: 10, md: 13, lg: 16, xl: 20, sheet: 24, pill: 999 } a
 
 /** Minimum touch target (iOS HIG). */
 export const HIT = 44;
+
+/** Tab bar style, shared by the tabs layout and the screens that hide it (locked mode). */
+export const TAB_BAR_STYLE = {
+  backgroundColor: 'rgba(22,21,31,0.96)',
+  borderTopColor: 'rgba(255,255,255,0.06)',
+} as const;

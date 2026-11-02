@@ -3,13 +3,14 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { WebView, type WebViewMessageEvent, type WebViewNavigation } from 'react-native-webview';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 
-import { START_URL } from '@/recognition/rules';
 import { displayUrl, shouldLoadInWebView } from '@/recognition/url';
 import { Text } from '../components';
 import { Icon, type IconName } from '../Icon';
 import { colors, HIT } from '../theme';
 
 type Props = {
+  /** Page to load (changing it navigates). */
+  sourceUrl: string;
   url: string;
   canGoBack: boolean;
   loading: boolean;
@@ -76,7 +77,7 @@ export const WebViewFrame = forwardRef<InstagramWebView, Props>(function WebView
       <View style={styles.viewport}>
         <WebView<object>
           ref={ref}
-          source={{ uri: START_URL }}
+          source={{ uri: p.sourceUrl }}
           style={StyleSheet.absoluteFill}
           // Persistent cookies (default WKWebsiteDataStore): the user signs in once, on Instagram's own page.
           incognito={false}
