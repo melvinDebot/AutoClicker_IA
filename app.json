@@ -16,7 +16,8 @@
       "bundleIdentifier": "dev.mdebot.autoclicker",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "6K8773H6XD"
     },
     "plugins": [
       "expo-router",
