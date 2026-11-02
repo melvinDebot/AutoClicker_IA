@@ -39,6 +39,8 @@ export type FakeOptions = {
   ignoreLikeTaps?: boolean;
   /** OCR reads another name on this account's row. */
   ocrLiesFor?: string;
+  /** OCR reads garbage on this row until the list is scrolled (row redrawn). */
+  ocrGarbageUntilScrollFor?: string;
   /** Opening this account's story shows another account's story. */
   storyAdvancesFor?: string;
   /** The profile is painted late: the first N snapshots of a profile show nothing. */
@@ -87,7 +89,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   taps: string[] = [];
   highlights: Highlight[] = [];
   private pending: string[] = [];
-  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor'>> &
+  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor' | 'ocrGarbageUntilScrollFor'>> &
     FakeOptions;
 
   constructor(
@@ -275,6 +277,7 @@ export class FakeInstagram implements PagePort, VisionPort {
     }
   }
 
+  private garbageScrolls = 0;
   async scrollList(): Promise<void> {
     this.scrolls += 1;
     if (this.o.stuckLoadingAtScroll !== undefined && this.scrolls >= this.o.stuckLoadingAtScroll) {
@@ -317,7 +320,16 @@ export class FakeInstagram implements PagePort, VisionPort {
     const st = await this.peek();
     const blocks: TextBlock[] = [];
     st.list?.rows.forEach((r) =>
-      blocks.push({ text: r.username === this.o.ocrLiesFor ? 'someone.else' : r.username, confidence: 1, box: r.link.box }),
+      blocks.push({
+        text:
+          r.username === this.o.ocrLiesFor
+            ? 'someone.else'
+            : r.username === this.o.ocrGarbageUntilScrollFor && this.scrolls === this.garbageScrolls
+              ? 'osunobnozu'
+              : r.username,
+        confidence: 1,
+        box: r.link.box,
+      }),
     );
     if (st.list?.title) blocks.push({ text: 'Followers', confidence: 1, box: st.list.title.box });
     if (st.profile && this.o.lateProfileSnapshots && this.lateLeft() > 0) return [];

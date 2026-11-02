@@ -216,7 +216,8 @@ export class Engine {
 
   // ---------------------------------------------------------------- one account
 
-  private async processUser(row: ListRow): Promise<void> {
+  private async processUser(firstRow: ListRow): Promise<void> {
+    let row = firstRow;
     const u = row.username;
     const { store, clock, page } = this.p;
     const sid = this.ctx.sessionId;
@@ -228,7 +229,19 @@ export class Engine {
 
     this.emit('pick_next_user', `${this.catchUpText()}suivant : @${u}`);
     // Visual confirmation of the row before opening it.
-    const rowCheck = await this.confirmRow(row);
+    let rowCheck = await this.confirmRow(row);
+    if (!rowCheck.ok) {
+      // Second chance: bring the row to the upper third of the list (away from banners and
+      // freshly loaded rows), find it again by name and read it again. Still no match → pause.
+      const s = await this.inspectGuarded();
+      await this.p.page.scrollList(Math.round(row.box.y - s.viewport.h * 0.3));
+      await this.sleep(TIMING.afterScroll);
+      const again = this.visibleRows(await this.inspectGuarded()).find((r) => r.username === u);
+      if (again) {
+        row = again;
+        rowCheck = await this.confirmRow(row);
+      }
+    }
     if (!rowCheck.ok) {
       throw new Stop('paused', `Le nom lu sur la capture${readText(rowCheck.read)} ne correspond pas au DOM (@${u}).`);
     }

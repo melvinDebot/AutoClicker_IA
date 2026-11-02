@@ -195,6 +195,12 @@ describe('Engine — stops', () => {
     expect(ig.taps).toEqual([]);
   });
 
+  it('reads an unreadable row again after moving it up, then continues', async () => {
+    const { outcome, results } = await run(users(5), { ocrGarbageUntilScrollFor: 'user00' }, { postsPerUser: 0, likeStory: false });
+    expect(outcome.status).toBe('done');
+    expect(results.user00!.state).toBe('done');
+  });
+
   it('pauses when the page stops answering (connection lost)', async () => {
     const { outcome } = await run(users(10), { disconnectAfterInspects: 6 }, { postsPerUser: 0 });
     expect(outcome.status).toBe('paused');
