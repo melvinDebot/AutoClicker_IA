@@ -1,9 +1,47 @@
 // Recognition rules, versioned and saved with each session.
-// Step 1 (spike): only URL rules. Selectors, FR/EN labels and thresholds come in
-// step 2, from the screenshots and from what the debug screen shows on the iPhone.
+// URL rules (spike) and the visible texts read on the screenshots of 2026-11-02
+// (Instagram iOS app, English, dark mode). DOM selectors and aria-labels come
+// from the debug screen on the iPhone (step 2).
 
-export const RULES_VERSION = '0.1.0-spike';
-export const TEMPLATES_VERSION = 'none';
+export const RULES_VERSION = '0.2.0-dataset';
+export const TEMPLATES_VERSION = '0.1.0-app-ios';
+
+/**
+ * Visible texts, French and English. Matching is tolerant to OCR misreads (see text.ts).
+ * "seen": read on a screenshot (app iOS, en) — still to check in the WebView.
+ * Others: to verify on the iPhone.
+ */
+export const TEXT = {
+  // seen (en): IMG_2122, IMG_2124
+  privateNotice: ['This profile is private', 'This account is private', 'Ce compte est privé', 'Ce profil est privé'],
+  // seen (en), split over two lines by OCR
+  privateHint: [
+    'Follow this profile to see their photos and videos.',
+    'Follow this account to see their photos and videos.',
+    'Suivez ce compte pour voir ses photos et vidéos.',
+  ],
+  // seen (en): IMG_2117
+  noPosts: ['No posts yet', 'Aucune publication', 'Pas encore de publications'],
+  // seen (en), often read "tollowers"
+  followersWord: ['followers', 'follower', 'abonnés', 'abonné(e)s', 'abonné'],
+  followingWord: ['following', 'suivi(e)s', 'abonnements'],
+  postsWord: ['posts', 'post', 'publications', 'publication'],
+  // seen (en). Never touched: only used to locate rows.
+  followButton: ['Follow', 'Follow back', 'Following', 'Requested', 'Suivre', 'Suivre en retour', 'Abonné(e)', 'Demandé'],
+  // seen (en): exclusion zone, these accounts are not the opened profile
+  suggested: ['Suggested for you', 'Suggestions pour vous'],
+  // Instagram warnings: immediate stop (none seen yet)
+  warning: [
+    'Try again later',
+    'Action blocked',
+    'We restrict certain activity to protect our community',
+    'We limit how often you can do certain things on Instagram',
+    'Réessayez plus tard',
+    'Action bloquée',
+    'Nous limitons certaines activités pour protéger notre communauté',
+    'Nous limitons la fréquence de certaines actions sur Instagram',
+  ],
+} as const;
 
 export const INSTAGRAM_HOSTS = ['www.instagram.com', 'instagram.com', 'm.instagram.com'] as const;
 export const START_URL = 'https://www.instagram.com/';

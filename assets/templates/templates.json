@@ -1,0 +1,43 @@
+{
+  "version": "0.1.0-app-ios",
+  "note": "First templates, cropped from screenshots of the Instagram iOS app (dark mode, 1206x2622 px @3x). The WebView shows the web version: regenerate every template from the DOM boxes on the iPhone (step 2) before trusting them.",
+  "templates": [
+    {
+      "name": "back_chevron",
+      "target": "back_button",
+      "file": "app-ios/back_chevron.png",
+      "source": "IMG_2119 (profile header)",
+      "status": "provisional"
+    },
+    {
+      "name": "back_chevron_round",
+      "target": "back_button",
+      "file": "app-ios/back_chevron_round.png",
+      "source": "IMG_2123 (followers list header)",
+      "status": "provisional"
+    },
+    {
+      "name": "lock_circle",
+      "target": "private_notice",
+      "file": "app-ios/lock_circle.png",
+      "source": "IMG_2122 (private profile)",
+      "status": "provisional"
+    },
+    {
+      "name": "camera_circle",
+      "target": "empty_posts_icon",
+      "file": "app-ios/camera_circle.png",
+      "source": "IMG_2117 (public profile without posts)",
+      "status": "provisional"
+    }
+  ],
+  "missing": [
+    { "name": "like_empty", "needs": "story and post opened, heart not liked" },
+    { "name": "like_filled", "needs": "story and post already liked (red heart)" },
+    { "name": "story_close", "needs": "story opened (close cross)" },
+    {
+      "name": "story_ring",
+      "needs": "not a template: detected by the pink-orange gradient around the avatar (colour rule), crops contain faces and stay out of git"
+    }
+  ]
+}
