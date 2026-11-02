@@ -46,7 +46,8 @@ export type SessionStatus = 'running' | 'paused' | 'done' | 'interrupted';
 export type UserState = 'todo' | 'processing' | 'done' | 'error';
 export type Privacy = 'public' | 'private' | 'unknown';
 export type StoryResult = 'liked' | 'already' | 'none' | 'skipped' | 'error';
-export type PostResult = 'liked' | 'already' | 'error';
+/** skipped = dry run (the like was only highlighted). */
+export type PostResult = 'liked' | 'already' | 'skipped' | 'error';
 
 export type AutoStop = 0 | 15 | 30 | 60; // minutes, 0 = never
 export type PostsPerUser = 0 | 1 | 2 | 3;

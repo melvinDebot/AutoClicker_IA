@@ -10,7 +10,7 @@ export function parsePostResults(json: string | null | undefined): PostResult[] 
   if (!json) return [];
   try {
     const v: unknown = JSON.parse(json);
-    return Array.isArray(v) ? v.filter((x): x is PostResult => x === 'liked' || x === 'already' || x === 'error') : [];
+    return Array.isArray(v) ? v.filter((x): x is PostResult => x === 'liked' || x === 'already' || x === 'skipped' || x === 'error') : [];
   } catch {
     return [];
   }
