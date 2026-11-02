@@ -69,7 +69,17 @@ export function usernameMatches(ocrText: string, username: string): boolean {
       .replace(/[il|]/g, 'l')
       .replace(/([_.])\1+/g, '$1');
   const n = username.length;
-  return levenshtein(fold(ocrText), fold(username)) <= (n >= 20 ? 2 : n >= 10 ? 1 : 0);
+  if (levenshtein(fold(ocrText), fold(username)) <= (n >= 20 ? 2 : n >= 10 ? 1 : 0)) return true;
+  // OCR often drops "_" and "." (drawn at the baseline) and mixes o/0, g/9, l/1 (seen: "son | of | 90d"
+  // for "son____of_____god"). Second chance without separators; digits stay distinct from each other.
+  const bare = (s: string) =>
+    fold(s)
+      .replace(/[_.\s]/g, '')
+      .replace(/0/g, 'o')
+      .replace(/9/g, 'g')
+      .replace(/1/g, 'l');
+  const b = bare(username);
+  return b.length >= 6 && levenshtein(bare(ocrText), b) <= (b.length >= 12 ? 1 : 0);
 }
 
 /** "12,1K" → 12100, "1 634" → 1634, "1,2 M" → 1200000. Null when unreadable. */
