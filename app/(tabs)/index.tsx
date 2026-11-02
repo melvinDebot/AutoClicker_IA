@@ -5,7 +5,7 @@ import type { WebViewMessageEvent, WebViewNavigation } from 'react-native-webvie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { WebViewRpc } from '@/adapters/webview/rpc';
-import type { DomDump } from '@/recognition/debugScripts';
+import { dumpScript, type DomDump } from '@/recognition/debugScripts';
 import { START_URL } from '@/recognition/rules';
 import { parseInstagramUrl, type ParsedUrl } from '@/recognition/url';
 import { Button, Text } from '@/ui/components';
@@ -68,6 +68,19 @@ export default function HomeScreen() {
     const node = webRef.current ? findNodeHandle(webRef.current) : null;
     return typeof node === 'number' ? node : null;
   }, []);
+
+  // DEVELOPMENT ONLY: dumps what the DOM exposes on every page, read on the Mac in the
+  // Metro console ([AC-DUMP]) to write the real selectors of rules.ts. Read-only, never on sign-in pages.
+  useEffect(() => {
+    if (!__DEV__ || nav.loading) return;
+    const t = setTimeout(() => {
+      rpc
+        .call<DomDump>(dumpScript(true), 6000)
+        .then((d) => console.log(`[AC-DUMP] ${JSON.stringify(d)}`))
+        .catch(() => {});
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [nav.url, nav.loading, rpc]);
 
   const parsed = parseInstagramUrl(nav.url);
   const cap = caption(parsed);
