@@ -58,12 +58,18 @@ export function textStartsLike(text: string, candidates: readonly string[]): boo
 
 /**
  * Username confirmation only: the exact value always comes from the DOM link.
- * Folds the letters OCR confuses (i/l/I/|, dotless ı); digits stay distinct so that
- * user00 never confirms user01. One more misread is tolerated from 10 characters.
+ * Folds the letters OCR confuses (i/l/I/|, dotless ı) and runs of "_" or "." (OCR merges
+ * "__" into "_"); digits stay distinct so that user00 never confirms user01.
+ * Tolerance: 0 under 10 characters, 1 from 10, 2 from 20.
  */
 export function usernameMatches(ocrText: string, username: string): boolean {
-  const fold = (s: string) => normalizeText(s).replace(/^@/, '').replace(/[il|]/g, 'l');
-  return levenshtein(fold(ocrText), fold(username)) <= (username.length >= 10 ? 1 : 0);
+  const fold = (s: string) =>
+    normalizeText(s)
+      .replace(/^@/, '')
+      .replace(/[il|]/g, 'l')
+      .replace(/([_.])\1+/g, '$1');
+  const n = username.length;
+  return levenshtein(fold(ocrText), fold(username)) <= (n >= 20 ? 2 : n >= 10 ? 1 : 0);
 }
 
 /** "12,1K" → 12100, "1 634" → 1634, "1,2 M" → 1200000. Null when unreadable. */

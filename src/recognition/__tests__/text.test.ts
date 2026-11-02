@@ -8,6 +8,11 @@ describe('OCR-tolerant text matching (misreads seen on the screenshots)', () => 
     expect(normalizeText('“Bless”')).toBe('"bless"');
   });
 
+  it('accepts double underscores merged by OCR (seen on the simulator)', () => {
+    expect(usernameMatches('talk_to_me_l_god_talk_to_me', 'talk_to_me__l__god_talk_to_me')).toBe(true);
+    expect(usernameMatches('user_00', 'user__01')).toBe(false);
+  });
+
   it('splits ligatures read by OCR ("ﬁ.nouvelleviebsm")', () => {
     expect(usernameMatches('ﬁ.nouvelleviebsm', 'fi.nouvelleviebsm')).toBe(true);
   });
