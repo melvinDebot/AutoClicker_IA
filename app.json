@@ -32,6 +32,24 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "49fcff88-4f81-4951-9fbd-f1733c220063"
+      }
+    },
+    "owner": "verseapp",
+    "updates": {
+      "url": "https://u.expo.dev/49fcff88-4f81-4951-9fbd-f1733c220063"
+    },
+    "android": {},
+    "runtimeVersion": {
+      "policy": "sdkVersion"
     }
   }
 }

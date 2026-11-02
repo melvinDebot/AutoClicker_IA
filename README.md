@@ -63,6 +63,15 @@ npx expo run:ios --device
 
 Ensuite, pour le JavaScript seul : `npm start` (Metro, dev client). L'iPhone et le Mac doivent être sur le même Wi-Fi ; si l'app reste sur l'écran du client de dev, choisir le serveur `http://<IP du Mac>:8081`.
 
+### Publier sur Expo (EAS Update, compte `verseapp`)
+
+```bash
+npx eas-cli@latest update --branch preview --environment preview --platform ios --message "…"
+```
+
+La mise à jour (runtime `exposdk:58.0.0`) s'ouvre dans **Expo Go** avec le QR code du tableau de bord EAS, ou le lien `exp://u.expo.dev/<projectId>/group/<groupId>`.
+Dans Expo Go, le module natif `vision-check` n'existe pas : l'app reste en **essai à blanc** (pas de confirmation sur capture, donc aucun vrai like). Les vrais likes demandent le dev build ou un build EAS.
+
 ## Vérifier
 
 ```bash
