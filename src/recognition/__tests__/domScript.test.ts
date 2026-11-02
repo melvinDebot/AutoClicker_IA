@@ -128,6 +128,11 @@ describe('inspectScript', () => {
       `<main data-r="0 45 364 620"><a href="/bless_dyna2/" data-r="16 87 77 77"><img alt="Photo de profil de bless_dyna2" data-r="16 87 77 77"></a></main>`,
     );
     expect(noStory.profile?.storyRing).toBe(false);
+    expect(noStory.profile?.postsCount).toBeNull();
+    const counted = page('/kaji_dodi6/', `<main data-r="0 45 364 620"><span data-r="121 121 80 40">0 publication</span></main>`);
+    expect(counted.profile?.postsCount).toBe(0);
+    const many = page('/gad_nathan/', `<main data-r="0 45 364 620"><span data-r="121 121 80 40">1 234 publications</span></main>`);
+    expect(many.profile?.postsCount).toBe(1234);
     const list = page(
       '/egliseicc_paris/followers/',
       `<h1 data-r="80 13 204 18">Followers</h1><main data-r="0 45 364 834">

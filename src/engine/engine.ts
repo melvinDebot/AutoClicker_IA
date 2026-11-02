@@ -26,6 +26,12 @@ export const SCAN_FAIL = 'Ouvrez la liste des abonnés d’un compte dans la Web
 
 const AUTO_STOP_LABEL: Record<number, string> = { 15: '15 min', 30: '30 min', 60: '1 h' };
 
+/** « what OCR read » for stop messages (helps fixing rules). */
+function readText(read: string[], sep = ' '): string {
+  const t = read.filter(Boolean).slice(0, 3).join(' | ');
+  return t ? `${sep}« ${t.length > 60 ? `${t.slice(0, 60)}…` : t} »` : `${sep}rien de lisible`;
+}
+
 function grow(b: Box, by: number): Box {
   return { x: b.x - by, y: b.y - by, w: b.w + by * 2, h: b.h + by * 2 };
 }
@@ -205,8 +211,9 @@ export class Engine {
 
     this.emit('pick_next_user', `${this.catchUpText()}suivant : @${u}`);
     // Visual confirmation of the row before opening it.
-    if (!(await this.confirmSettled(row.link.box, (t) => usernameMatches(t, u)))) {
-      throw new Stop('paused', `Le nom lu sur la capture ne correspond pas au DOM (@${u}).`);
+    const rowCheck = await this.confirmSettled(row.link.box, (t) => usernameMatches(t, u));
+    if (!rowCheck.ok) {
+      throw new Stop('paused', `Le nom lu sur la capture${readText(rowCheck.read)} ne correspond pas au DOM (@${u}).`);
     }
     await store.markProcessing(sid, u);
     this.known.set(u, 'processing');
@@ -218,14 +225,15 @@ export class Engine {
       const prof = await this.waitProfile(u);
 
       this.emit('classify_profile', 'Analyse du profil');
-      if (!(await this.confirmSettled({ x: 0, y: 0, w: prof.viewport.w, h: prof.viewport.h * 0.25 }, (t) => usernameMatches(t, u)))) {
-        throw new Stop('paused', `Le profil affiché ne semble pas être @${u} (capture).`);
+      const profCheck = await this.confirmSettled({ x: 0, y: 0, w: prof.viewport.w, h: prof.viewport.h * 0.25 }, (t) => usernameMatches(t, u));
+      if (!profCheck.ok) {
+        throw new Stop('paused', `Le profil affiché ne semble pas être @${u} (capture${readText(profCheck.read, ' : ')}).`);
       }
       const pr = prof.profile;
       if (!pr) throw new Stop('paused', 'Profil illisible.');
 
       if (pr.privateNotice) {
-        if (!(await this.confirmSettled(pr.privateNotice.box, (t) => textMatches(t, TEXT.privateNotice)))) {
+        if (!(await this.confirmSettled(pr.privateNotice.box, (t) => textMatches(t, TEXT.privateNotice))).ok) {
           throw new Stop('paused', 'Compte privé selon le DOM mais pas selon la capture.');
         }
         result.privacy = 'private';
@@ -233,7 +241,10 @@ export class Engine {
       } else {
         result.privacy = 'public';
         result.story = await this.handleStory(u, prof);
-        const wanted = this.ctx.settings.postsPerUser > 0 && !pr.emptyNotice ? await this.revealTiles(u, this.ctx.settings.postsPerUser) : [];
+        const wanted =
+          this.ctx.settings.postsPerUser > 0 && !pr.emptyNotice && pr.postsCount !== 0
+            ? await this.revealTiles(u, Math.min(this.ctx.settings.postsPerUser, pr.postsCount ?? Number.POSITIVE_INFINITY))
+            : [];
         for (let k = 0; k < wanted.length; k++) result.posts.push(await this.handlePost(u, wanted[k]!, k));
         if (wanted.length === 0) this.emit('classify_profile', pr.emptyNotice ? 'Aucune publication' : 'Profil public');
       }
@@ -487,12 +498,26 @@ export class Engine {
    * Same as confirmText, read again a few times: Instagram slides new pages in, so the first
    * snapshot can be taken before the page is painted. Still a disagreement after that → false.
    */
-  private async confirmSettled(box: Box, ok: (text: string) => boolean): Promise<boolean> {
+  private async confirmSettled(box: Box, ok: (text: string) => boolean): Promise<{ ok: boolean; read: string[] }> {
+    let read: string[] = [];
     for (let i = 0; i < 3; i++) {
       if (i > 0) await this.sleep(TIMING.settle);
-      if (await this.confirmText(box, ok)) return true;
+      const r = await this.ocrTexts(box);
+      read = r ?? [];
+      if (r === null || r.some(ok)) return { ok: true, read: r ?? [] };
     }
-    return false;
+    return { ok: false, read };
+  }
+
+  /** Texts read by OCR in a region; null without the vision module (dry run only). */
+  private async ocrTexts(box: Box): Promise<string[] | null> {
+    if (!this.p.vision.available()) return null;
+    const snap = await this.p.vision.snapshot();
+    try {
+      return (await this.p.vision.ocr(snap, grow(box, 4))).map((b) => b.text);
+    } finally {
+      await this.p.vision.release(snap);
+    }
   }
 
   /** OCR of a region on a fresh snapshot. Without the vision module (dry run only): accepted. */

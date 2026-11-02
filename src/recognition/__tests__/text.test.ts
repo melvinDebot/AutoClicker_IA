@@ -8,6 +8,10 @@ describe('OCR-tolerant text matching (misreads seen on the screenshots)', () => 
     expect(normalizeText('“Bless”')).toBe('"bless"');
   });
 
+  it('splits ligatures read by OCR ("ﬁ.nouvelleviebsm")', () => {
+    expect(usernameMatches('ﬁ.nouvelleviebsm', 'fi.nouvelleviebsm')).toBe(true);
+  });
+
   it('accepts "tollowers" for followers', () => {
     expect(textMatches('tollowers', TEXT.followersWord)).toBe(true);
     expect(textMatches('tollowing', TEXT.followingWord)).toBe(true);

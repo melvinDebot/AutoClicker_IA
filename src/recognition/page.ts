@@ -47,6 +47,8 @@ export type PageState = {
     username: string;
     privateNotice: DomEl | null;
     emptyNotice: boolean;
+    /** Posts count of the header ("8 publications"), null when unreadable. */
+    postsCount: number | null;
     avatar: DomEl | null;
     storyRing: boolean;
     tiles: DomEl[];

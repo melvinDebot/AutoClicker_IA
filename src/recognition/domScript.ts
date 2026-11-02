@@ -244,6 +244,18 @@ if (seg.length === 1 && R.reserved.indexOf((seg[0] || '').toLowerCase()) < 0) {
   }
   var profileStory = storyButton(header, seg[0]) || storyAvatar(avatarImg);
   if (profileStory) { storyRing = true; ringBox = rectOf(profileStory); }
+  // "8 publications" / "1 post" in the profile header (seen on the iPhone): 0 → nothing to look for.
+  var postsCount = null, cnodes = document.querySelectorAll('span,div,li');
+  for (var i = 0; i < cnodes.length && postsCount === null; i++) {
+    if (cnodes[i].childElementCount > 3) continue;
+    var ct = norm(cnodes[i].textContent);
+    var cm = /^([0-9][0-9 .,]*)\s*(k|m)?\s*(publications?|posts?)$/.exec(ct);
+    if (cm) {
+      var cn = Number(cm[1].replace(/[ .,]/g, ''));
+      if (cm[2] === 'k') cn *= 1000; else if (cm[2] === 'm') cn *= 1000000;
+      postsCount = isNaN(cn) ? null : cn;
+    }
+  }
   var priv = textEls(L.privateNotice, 60);
   var tiles = [], tnodes = document.querySelectorAll('a[href*="/p/"],a[href*="/reel/"]');
   for (var i = 0; i < tnodes.length; i++) {
@@ -254,6 +266,7 @@ if (seg.length === 1 && R.reserved.indexOf((seg[0] || '').toLowerCase()) < 0) {
   tiles.sort(function (a, b) { var ra = rectOf(a), rb = rectOf(b); return (Math.round(ra.y) - Math.round(rb.y)) || (ra.x - rb.x); });
   profile = { username: seg[0], privateNotice: priv.length ? reg1(priv[0], 'private_notice') : null,
     emptyNotice: textEls(L.noPosts, 40).length > 0,
+    postsCount: postsCount,
     avatar: profileStory ? reg1(profileStory, 'avatar_story') : avatarImg ? reg1(clickable(avatarImg), 'avatar_story', ringBox || rectOf(avatarImg)) : null,
     storyRing: storyRing,
     tiles: tiles.slice(0, 12).map(function (t) { var e = reg1(t, 'post_tile'); e.href = new URL(t.getAttribute('href'), location.href).pathname; return e; }) };

@@ -1,10 +1,13 @@
 // Text comparison tolerant to OCR misreads, observed on the screenshots:
 // "followers" read as "tollowers", "sa.ina775z" as "sa.ına775z", "lyor" as "Iyor", "hslcdd" as "hsicdd".
 
-/** Lowercase, no accents, OCR look-alikes folded (dotless ı, curly quotes), single spaces. */
+/**
+ * Lowercase, no accents, OCR look-alikes folded (dotless ı, curly quotes), single spaces.
+ * NFKD also splits ligatures OCR returns as one character ("ﬁ" → "fi").
+ */
 export function normalizeText(s: string): string {
   return s
-    .normalize('NFD')
+    .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/ı/g, 'i')
     .replace(/[’‘`]/g, "'")

@@ -182,6 +182,7 @@ export class FakeInstagram implements PagePort, VisionPort {
           username: f.u,
           privateNotice: u.private ? el('private', 'private_notice', { x: 60, y: 520, w: 270, h: 30 }) : null,
           emptyNotice: !u.private && !(u.posts ?? []).length,
+          postsCount: (u.posts ?? []).length,
           avatar: el(`ring:${f.u}`, 'avatar_story', { x: 16, y: 80, w: 90, h: 90 }),
           storyRing: !!u.story && !u.private,
           tiles: u.private || (this.o.tilesBelowFold && this.pageScrolls === 0) ? [] : (u.posts ?? []).map((_, k) => el(`tile:${f.u}:${k}`, 'post_tile', { x: (k % 3) * 130, y: 420 + Math.floor(k / 3) * 130, w: 128, h: 128 }, { href: `/p/${f.u}-${k}/` })),
