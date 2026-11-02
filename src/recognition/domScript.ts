@@ -327,6 +327,33 @@ hit.dispatchEvent(new MouseEvent('click', base));
 return { ok: true };`;
 }
 
+/** DEVELOPMENT diagnostics for a row the snapshot disagrees with: copies, real visibility, hit test, scroller. */
+export function diagnoseRowScript(username: string): string {
+  return `
+var u = ${JSON.stringify(username)};
+function chain(el) {
+  var out = [];
+  for (var n = el, k = 0; n && n !== document.documentElement && k < 25; n = n.parentElement, k++) {
+    var cs = getComputedStyle(n);
+    if (Number(cs.opacity) < 1 || cs.visibility !== 'visible' || cs.display === 'none' || cs.transform !== 'none' || cs.position === 'fixed' || /(auto|scroll)/.test(cs.overflowY))
+      out.push(n.tagName.toLowerCase() + '{op:' + cs.opacity + ',vis:' + cs.visibility + ',tr:' + (cs.transform === 'none' ? '-' : 'yes') + ',pos:' + cs.position + ',ov:' + cs.overflowY + ',st:' + n.scrollTop + '/' + n.scrollHeight + '}');
+  }
+  return out;
+}
+var copies = [];
+document.querySelectorAll('a[href="/' + u + '/"]').forEach(function (a) {
+  var r = a.getBoundingClientRect();
+  var hit = document.elementFromPoint(r.left + Math.min(r.width / 2, 30), r.top + r.height / 2);
+  copies.push({ y: Math.round(r.top), h: Math.round(r.height), w: Math.round(r.width), text: (a.textContent || '').slice(0, 30),
+    hitInside: !!hit && (a === hit || a.contains(hit)), hit: hit ? hit.tagName.toLowerCase() + ' ' + (hit.textContent || '').slice(0, 30) : null,
+    chain: chain(a) });
+});
+var se = document.scrollingElement;
+var ref = window.__acScroll && window.__acScroll.deref();
+return { url: location.pathname, docScroll: se ? se.scrollTop : null, innerScroller: ref ? ref.tagName.toLowerCase() + ' st=' + ref.scrollTop + ' sh=' + ref.scrollHeight + ' ch=' + ref.clientHeight + ' isDoc=' + (ref === se) : null,
+  mains: document.querySelectorAll('main').length, copies: copies };`;
+}
+
 /** Brings the post / story heart into view (it is often below the image). Returns false if none. */
 export function revealHeartScript(): string {
   return `

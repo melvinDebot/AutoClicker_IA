@@ -132,6 +132,8 @@ export const sqliteStore: StorePort = {
   },
 
   async event(sessionId, type, payload, now) {
+    // DEVELOPMENT ONLY: diagnostics events in the Metro console.
+    if (__DEV__ && /mismatch|interrupted|warning|scroll/.test(type)) console.log(`[AC-EVENT] ${type} ${JSON.stringify(payload)}`);
     await db.insert(events).values({ sessionId, at: now, type, payloadJson: JSON.stringify(payload ?? null) });
   },
 };

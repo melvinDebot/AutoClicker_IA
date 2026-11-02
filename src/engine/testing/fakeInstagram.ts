@@ -53,6 +53,8 @@ export type FakeOptions = {
   postBackSkipsProfileFor?: string;
   /** The profile header of this account is read by OCR in two pieces (long name wrapped). */
   splitProfileNameFor?: string;
+  /** Scrolling the list has no effect (wrong container). */
+  brokenScroll?: boolean;
 };
 
 type Frame =
@@ -89,7 +91,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   taps: string[] = [];
   highlights: Highlight[] = [];
   private pending: string[] = [];
-  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor' | 'ocrGarbageUntilScrollFor'>> &
+  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor' | 'ocrGarbageUntilScrollFor' | 'brokenScroll'>> &
     FakeOptions;
 
   constructor(
@@ -280,6 +282,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   private garbageScrolls = 0;
   async scrollList(): Promise<void> {
     this.scrolls += 1;
+    if (this.o.brokenScroll) return;
     if (this.o.stuckLoadingAtScroll !== undefined && this.scrolls >= this.o.stuckLoadingAtScroll) {
       this.loadingTicks = Number.POSITIVE_INFINITY;
       return;

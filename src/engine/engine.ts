@@ -176,7 +176,17 @@ export class Engine {
       this.windowIndex += 1;
       await this.p.store.updateSession(this.ctx.sessionId, { windowIndex: this.windowIndex }, this.p.clock.now());
       const fresh = this.visibleRows(after).filter((r) => !this.known.has(r.username));
+      const before = s.list?.scroll;
+      const now = after.list?.scroll;
+      await this.p.store.event(this.ctx.sessionId, 'scroll', { before, after: now, fresh: fresh.length }, this.p.clock.now());
       if (fresh.length === 0 && !after.loading) {
+        // End of the list only when really at the bottom (or at the suggestions). A scroll that did
+        // not move without being at the bottom is a broken scroll: pause, never "done".
+        const atBottom = !!now && now.top + now.client >= now.height - 4;
+        const moved = !!before && !!now && Math.abs(now.top - before.top) > 2;
+        if (!moved && !atBottom && !after.list?.suggestedVisible) {
+          throw new Stop('paused', 'Le défilement de la liste n’a aucun effet : rien de nouveau chargé, fin de liste non confirmée.');
+        }
         emptyScrolls += 1;
         await this.p.store.event(this.ctx.sessionId, 'scroll_empty', { emptyScrolls }, this.p.clock.now());
         if (emptyScrolls >= 2) throw new Stop('done', 'Fin de la liste');
@@ -243,6 +253,8 @@ export class Engine {
       }
     }
     if (!rowCheck.ok) {
+      const diag = await this.p.page.diagnoseRow?.(u).catch((e: unknown) => String(e));
+      await store.event(sid, 'row_mismatch', { username: u, box: row.link.box, read: rowCheck.read, diag }, clock.now());
       throw new Stop('paused', `Le nom lu sur la capture${readText(rowCheck.read)} ne correspond pas au DOM (@${u}).`);
     }
     await store.markProcessing(sid, u);

@@ -89,6 +89,12 @@ describe('Engine — discovered list', () => {
     expect(ig.scrolls).toBe(2);
   });
 
+  it('pauses (never "done") when scrolling has no effect and accounts remain below', async () => {
+    const { outcome } = await run(users(30), { brokenScroll: true }, { postsPerUser: 0, likeStory: false });
+    expect(outcome.status).toBe('paused');
+    expect(outcome.reason).toMatch(/aucun effet/);
+  });
+
   it('pauses (not done) when the loading never ends', async () => {
     const { outcome } = await run(users(20), { stuckLoadingAtScroll: 1 }, { postsPerUser: 0, likeStory: false });
     expect(outcome.status).toBe('paused');

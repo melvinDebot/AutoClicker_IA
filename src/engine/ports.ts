@@ -16,6 +16,8 @@ export interface PagePort {
   scrollPage(dy: number): Promise<void>;
   /** Brings the post / story heart into view. False when the page has none. */
   revealHeart(): Promise<boolean>;
+  /** Development diagnostics for a row the snapshot disagrees with (optional). */
+  diagnoseRow?(username: string): Promise<unknown>;
   /** Shows what the engine is about to touch (or would touch, in dry run). */
   highlight(h: Highlight): void;
 }
