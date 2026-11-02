@@ -94,7 +94,9 @@ export const WebViewFrame = forwardRef<InstagramWebView, Props>(function WebView
           contentInsetAdjustmentBehavior="never"
           // Safari Web Inspector on the Mac, development builds only.
           webviewDebuggingEnabled={__DEV__}
-          scrollEnabled={!p.locked}
+          // Never scrollEnabled={false} while locked: on iOS the native scroll view owns the page
+          // scroll and would reset every programmatic scroll to the top (seen on the simulator).
+          // The locked overlay already blocks touches.
         />
         {p.overlay}
         {p.loading ? (
