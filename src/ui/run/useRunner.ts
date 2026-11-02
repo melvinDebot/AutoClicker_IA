@@ -62,12 +62,18 @@ export function useRunner(deps: { page: PagePort; getViewTag: () => number | nul
         { label: 'Bouton retour', ok: false },
       ],
     });
-    const [r] = await Promise.all([engine.scan(), realClock.sleep(900)]);
-    if (!r.ok) {
-      setPhase({ name: 'scan_failed', checks: r.checks, message: r.message });
-      return;
+    const fail = (message: string, checks: ScanCheck[] = []) => setPhase({ name: 'scan_failed', checks, message });
+    let r: Awaited<ReturnType<Engine['scan']>>;
+    let resumable: SessionRow | null;
+    let today: number;
+    try {
+      [r] = await Promise.all([engine.scan(), realClock.sleep(900)]);
+      if (!r.ok) return fail(r.message, r.checks);
+      [resumable, today] = await Promise.all([findResumable(r.targetAccount), likesToday()]);
+    } catch (e) {
+      // Any unexpected error ends the scan with a readable message instead of a spinner forever.
+      return fail(`Erreur pendant l’analyse : ${e instanceof Error ? e.message : String(e)}`);
     }
-    const [resumable, today] = await Promise.all([findResumable(r.targetAccount), likesToday()]);
     setPhase({
       name: 'recap',
       checks: r.checks,

@@ -68,7 +68,12 @@ export class Engine {
 
     // Visual confirmation: the title (or a row) must be readable on the snapshot.
     if (this.p.vision.available() && s.list.title) {
-      const ok = await this.confirmText(s.list.title.box, (t) => textMatches(t, DOM.followersTitle) || textMatches(t, TEXT.followersWord));
+      let ok: boolean;
+      try {
+        ok = await this.confirmText(s.list.title.box, (t) => textMatches(t, DOM.followersTitle) || textMatches(t, TEXT.followersWord));
+      } catch (e) {
+        return { ok: false, message: `Capture de l’écran impossible : ${e instanceof Error ? e.message : String(e)}`, checks };
+      }
       if (!ok) {
         checks[0] = { label: 'Titre de la liste illisible sur la capture', ok: false };
         return { ok: false, message: 'Le DOM et la capture ne concordent pas sur la liste. Rechargez la page.', checks };

@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { findNodeHandle, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -69,10 +69,9 @@ export default function HomeScreen() {
   );
   useEffect(() => () => rpc.cancelAll('Écran fermé'), [rpc]);
 
-  const getViewTag = useCallback(() => {
-    const node = webRef.current ? findNodeHandle(webRef.current) : null;
-    return typeof node === 'number' ? node : null;
-  }, []);
+  // New architecture: the WebView ref is an imperative handle (goBack, injectJavaScript…), not a
+  // component, so findNodeHandle throws. The native module finds the app's single WKWebView itself.
+  const getViewTag = useCallback((): number | null => null, []);
 
   const page = useMemo(
     () =>
