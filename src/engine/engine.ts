@@ -26,6 +26,14 @@ export const SCAN_FAIL = 'Ouvrez la liste des abonnés d’un compte dans la Web
 
 const AUTO_STOP_LABEL: Record<number, string> = { 15: '15 min', 30: '30 min', 60: '1 h' };
 
+function pathOf(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+}
+
 /** « what OCR read » for stop messages (helps fixing rules). */
 function readText(read: string[], sep = ' '): string {
   const t = read.filter(Boolean).slice(0, 3).join(' | ');
@@ -294,18 +302,14 @@ export class Engine {
     this.mark(pr.avatar.box, 'Story', 'target');
     this.emit('open_story', 'Ouverture de la story');
     await this.tapOrStop(pr.avatar, 'anneau de story');
-    let st = await this.waitFor((s) => s.kind === 'story' && !!s.story, 'story');
+    let st = await this.waitHeart('story', (s) => (s.kind === 'story' ? s.story : null));
     if (st.story!.username && st.story!.username.toLowerCase() !== u.toLowerCase()) {
       await this.closeStory(st, u);
       return 'error'; // the viewer moved to another account: never like it
     }
     let res: StoryResult;
-    if (!st.story!.like && (await this.p.page.revealHeart())) {
-      await this.sleep(TIMING.afterScroll);
-      st = await this.waitFor((s) => s.kind === 'story' && !!s.story, 'story');
-    }
     const heart = st.story!.like;
-    if (!heart) throw new Stop('paused', 'Cœur de la story introuvable.');
+    if (!heart) throw new Stop('paused', `Cœur de la story introuvable (${pathOf(st.url)}).`);
     if (st.story!.liked) {
       res = 'already';
       this.emit('like_story', 'Story déjà likée · rien à toucher');
@@ -357,14 +361,9 @@ export class Engine {
     this.mark(tile.box, `Publication ${k + 1}`, 'target');
     this.emit('open_post', `Ouverture de la publication ${k + 1}`);
     await this.tapOrStop(tile, `publication ${k + 1}`);
-    let ps = await this.waitFor((s) => !!s.post, `publication ${k + 1}`);
-    // The heart is usually below the image: bring it into view first.
-    if (!ps.post!.like && (await this.p.page.revealHeart())) {
-      await this.sleep(TIMING.afterScroll);
-      ps = await this.waitFor((s) => !!s.post, `publication ${k + 1}`);
-    }
+    const ps = await this.waitHeart(`publication ${k + 1}`, (s) => s.post);
     const heart = ps.post!.like;
-    if (!heart) throw new Stop('paused', `Cœur de la publication ${k + 1} introuvable.`);
+    if (!heart) throw new Stop('paused', `Cœur de la publication ${k + 1} introuvable (${pathOf(ps.url)}).`);
     let res: PostResult;
     if (ps.post!.liked) {
       res = 'already';
@@ -435,6 +434,20 @@ export class Engine {
     } catch {
       // best effort only
     }
+  }
+
+  /**
+   * Post or story page: its URL is there before its content. Waits for the heart, bringing it
+   * into view (it is often below the image), a few times before giving up.
+   */
+  private async waitHeart(what: string, part: (s: PageState) => { like: DomEl | null } | null): Promise<PageState> {
+    let s = await this.waitFor((x) => !!part(x), what);
+    for (let i = 0; i < 6 && !part(s)?.like; i++) {
+      await this.p.page.revealHeart().catch(() => false);
+      await this.sleep(TIMING.settle);
+      s = await this.waitFor((x) => !!part(x), what);
+    }
+    return s;
   }
 
   private async waitProfile(u: string): Promise<PageState> {
