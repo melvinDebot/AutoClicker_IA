@@ -45,11 +45,18 @@ App iPhone personnelle (Expo, dev build) : dans une WebView Instagram où vous �
   export GEM_HOME="$HOME/.local/share/cocoapods-gems" GEM_PATH="$HOME/.local/share/cocoapods-gems" PATH="$HOME/.local/share/cocoapods-gems/bin:$PATH" LANG=en_US.UTF-8
   ```
 - Signature : `ios.appleTeamId` dans `app.json` (équipe personnelle pour l'instant, profil valable 7 jours ; remplacer par l'équipe payante une fois ajoutée dans Xcode › Réglages › Comptes).
-- Le projet vit dans une image disque APFS sur le SSD (le SSD est en exFAT) : la monter avant de travailler.
+- **Où est le projet.** Le code de référence (dépôt git) est dans `/Volumes/Extreme SSD/Dev/autoClicker`. Le SSD est en exFAT (blocs de 1 Mo, fichiers `._*`, espace dans le chemin) : on n'y installe pas `node_modules` et on n'y compile pas.
+- **Où on compile.** Une copie de build vit dans une image disque APFS sur le même SSD, avec `node_modules`, le projet Xcode et Metro. La monter, puis récupérer le code :
 
   ```bash
   hdiutil attach "/Volumes/Extreme SSD/Dev/autoClicker.sparsebundle"
   ```
+
+  ```bash
+  cd /Volumes/autoClicker/autoclicker && git pull ssd feature/foundation-spike && npm install
+  ```
+
+  Si le SSD a été débranché sans éjection et que l'image refuse de se monter (« aucun système de fichiers montable ») : `hdiutil detach diskN -force` sur l'ancienne image, puis l'attacher à nouveau.
 
 ## Lancer
 
