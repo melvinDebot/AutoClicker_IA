@@ -17,6 +17,15 @@ function load(path: string, html: string) {
     const [x = 0, y = 0, w2 = 0, h = 0] = r.length === 4 && !r.some(Number.isNaN) ? r : [0, 0, 0, 0];
     return { x, y, width: w2, height: h, left: x, top: y, right: x + w2, bottom: y + h, toJSON: () => ({}) } as DOMRect;
   };
+  // Hit test from the boxes: the last element (deepest / later in the page) containing the point wins.
+  w.document.elementFromPoint = (px: number, py: number) => {
+    let best: Element | null = null;
+    w.document.querySelectorAll('[data-r]').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (px >= r.left && px < r.right && py >= r.top && py < r.bottom) best = el;
+    });
+    return best;
+  };
   return w;
 }
 

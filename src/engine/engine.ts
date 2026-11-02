@@ -219,7 +219,7 @@ export class Engine {
 
     this.emit('pick_next_user', `${this.catchUpText()}suivant : @${u}`);
     // Visual confirmation of the row before opening it.
-    const rowCheck = await this.confirmSettled(row.link.box, (t) => usernameMatches(t, u));
+    const rowCheck = await this.confirmRow(row);
     if (!rowCheck.ok) {
       throw new Stop('paused', `Le nom lu sur la capture${readText(rowCheck.read)} ne correspond pas au DOM (@${u}).`);
     }
@@ -237,7 +237,8 @@ export class Engine {
       if (!profCheck.ok) {
         throw new Stop('paused', `Le profil affiché ne semble pas être @${u} (capture${readText(profCheck.read, ' : ')}).`);
       }
-      const pr = prof.profile;
+      // Read the profile again now that it is painted (counters, private notice, story ring).
+      const pr = (await this.waitProfile(u)).profile;
       if (!pr) throw new Stop('paused', 'Profil illisible.');
 
       if (pr.privateNotice) {
@@ -450,8 +451,38 @@ export class Engine {
     return s;
   }
 
+  /** Profile of this account, with its header painted (the URL changes before the content). */
   private async waitProfile(u: string): Promise<PageState> {
-    return this.waitFor((s) => s.kind === 'profile' && s.username?.toLowerCase() === u.toLowerCase() && !!s.profile, `profil de @${u}`);
+    return this.waitFor(
+      (s) =>
+        s.kind === 'profile' &&
+        s.username?.toLowerCase() === u.toLowerCase() &&
+        !!s.profile &&
+        (!!s.profile.avatar || !!s.profile.privateNotice || s.profile.postsCount !== null),
+      `profil de @${u}`,
+    );
+  }
+
+  /**
+   * Row confirmation: re-reads the page before each OCR attempt, so that a list that moved
+   * (scroll restored when coming back) is followed by username, never by a stale position.
+   */
+  private async confirmRow(row: ListRow): Promise<{ ok: boolean; read: string[] }> {
+    let read: string[] = [];
+    let box = row.link.box;
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) {
+        await this.sleep(TIMING.settle);
+        const s = await this.inspectGuarded();
+        const again = this.visibleRows(s).find((r) => r.username === row.username);
+        if (!again) return { ok: false, read: [`@${row.username} n’est plus visible`] };
+        box = again.link.box;
+      }
+      const r = await this.ocrTexts(box);
+      if (r === null || r.some((t) => usernameMatches(t, row.username))) return { ok: true, read: r ?? [] };
+      read = r;
+    }
+    return { ok: false, read };
   }
 
   /** Waits for a precise screen. Not there twice in a row → pause. */

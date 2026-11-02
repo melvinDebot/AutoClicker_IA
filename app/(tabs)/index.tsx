@@ -139,6 +139,16 @@ export default function HomeScreen() {
         .call<DomDump>(dumpScript(false), 6000) // off-screen elements too (heart below the fold…)
         .then((d) => console.log(`[AC-DUMP] ${JSON.stringify(d)}`))
         .catch(() => {});
+      // Raw HTML of the profile counters (posts / followers), to write their rule.
+      rpc
+        .call<string>(
+          `var m = document.querySelector('main'); if (!m) return '';
+           var a = m.querySelector('a[href$="/followers/"]'); var n = a; for (var k = 0; k < 4 && n && n.parentElement; k++) n = n.parentElement;
+           return n ? n.outerHTML.replace(/ class="[^"]*"/g, '').slice(0, 2500) : '';`,
+          6000,
+        )
+        .then((h) => h && console.log(`[AC-HTML] ${h}`))
+        .catch(() => {});
     }, 2500);
     return () => clearTimeout(t);
   }, [nav.url, nav.loading, locked, rpc]);

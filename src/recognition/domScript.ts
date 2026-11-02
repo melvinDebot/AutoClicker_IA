@@ -210,8 +210,14 @@ if (seg[1] === 'followers' || titleEls.length) {
     var sb = storyButton(row, u) || storyAvatar(row.querySelector('img'));
     if (sb) { ring = true; ab = rectOf(sb); }
     else if (ring && canvases[0]) ab = rectOf(canvases[0]);
+    // Hit test at the name: a row covered by a banner ("Use the app"…) or a bar is not fully visible.
+    var nb2 = rectOf(nameLink), uncovered = true;
+    if (typeof document.elementFromPoint === 'function') {
+      var hit = document.elementFromPoint(nb2.x + Math.min(nb2.w / 2, 30), nb2.y + nb2.h / 2);
+      uncovered = !!hit && (row === hit || row.contains(hit));
+    }
     rows.push({ username: u, link: reg1(nameLink, 'user_row'), box: rb, avatar: ab, storyRing: ring,
-      fullyVisible: rb.y >= titleBottom - 1 && rb.y + rb.h <= bottomLimit + 1 });
+      fullyVisible: uncovered && rb.y >= titleBottom - 1 && rb.y + rb.h <= bottomLimit + 1 });
     if (!scroller) {
       for (var s = first.parentElement; s && s !== document.body; s = s.parentElement) {
         var cs = window.getComputedStyle(s);
