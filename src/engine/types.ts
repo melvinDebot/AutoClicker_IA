@@ -54,6 +54,8 @@ export type PostsPerUser = 0 | 1 | 2 | 3;
 
 export type Settings = {
   likeStory: boolean;
+  /** Like the story of accounts without any post, even when likeStory is off. */
+  storyIfNoPosts: boolean;
   postsPerUser: PostsPerUser;
   autoStopMin: AutoStop;
   dryRun: boolean;
@@ -63,6 +65,7 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   likeStory: true,
+  storyIfNoPosts: true,
   postsPerUser: 2,
   autoStopMin: 30,
   dryRun: true,

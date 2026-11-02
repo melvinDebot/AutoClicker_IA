@@ -52,20 +52,23 @@ export function SwitchRow(props: {
   onChange: (v: boolean) => void;
 }) {
   const { value, onChange, ...header } = props;
+  // The whole row toggles the switch, like the prototype's <label for="…">. VoiceOver uses the Switch.
   return (
-    <SettingHeader
-      {...header}
-      right={
-        <Switch
-          value={value}
-          onValueChange={onChange}
-          trackColor={{ false: colors.switchOff, true: colors.primary }}
-          ios_backgroundColor={colors.switchOff}
-          accessibilityLabel={props.title}
-          accessibilityHint={props.description}
-        />
-      }
-    />
+    <Pressable onPress={() => onChange(!value)} accessible={false}>
+      <SettingHeader
+        {...header}
+        right={
+          <Switch
+            value={value}
+            onValueChange={onChange}
+            trackColor={{ false: colors.switchOff, true: colors.primary }}
+            ios_backgroundColor={colors.switchOff}
+            accessibilityLabel={props.title}
+            accessibilityHint={props.description}
+          />
+        }
+      />
+    </Pressable>
   );
 }
 

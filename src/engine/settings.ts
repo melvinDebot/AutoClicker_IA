@@ -23,6 +23,7 @@ export function parseSettings(raw: string | null | undefined): Settings {
   const d = DEFAULT_SETTINGS;
   return {
     likeStory: typeof v.likeStory === 'boolean' ? v.likeStory : d.likeStory,
+    storyIfNoPosts: typeof v.storyIfNoPosts === 'boolean' ? v.storyIfNoPosts : d.storyIfNoPosts,
     postsPerUser: POSTS.includes(v.postsPerUser as PostsPerUser) ? (v.postsPerUser as PostsPerUser) : d.postsPerUser,
     autoStopMin: AUTO_STOPS.includes(v.autoStopMin as AutoStop) ? (v.autoStopMin as AutoStop) : d.autoStopMin,
     // Dry run stays on unless explicitly turned off by the user.

@@ -79,8 +79,16 @@ describe('Engine — full run', () => {
     expect(dryTags.filter((t) => t.label === 'Simulé').length).toBeGreaterThan(0);
   });
 
+  it('likes the story of accounts without any post when the fallback is on', async () => {
+    const list = users(3, (i) => (i === 1 ? { posts: [], story: true } : { story: true }));
+    const { results } = await run(list, {}, { likeStory: false, storyIfNoPosts: true, postsPerUser: 2 });
+    expect(results.user01!.result?.story).toBe('liked');
+    expect(results.user00!.result?.story).toBe('skipped'); // has posts: posts only
+    expect(results.user00!.result?.posts).toEqual(['liked', 'liked']);
+  });
+
   it('respects the settings: no story, zero post', async () => {
-    const { ig, results } = await run(users(3), {}, { likeStory: false, postsPerUser: 0 });
+    const { ig, results } = await run(users(3), {}, { likeStory: false, storyIfNoPosts: false, postsPerUser: 0 });
     expect(ig.likesSent).toBe(0);
     expect(ig.taps.some((t) => t.startsWith('ring') || t.startsWith('tile'))).toBe(false);
     expect(Object.values(results).every((r) => r.result?.story === 'skipped')).toBe(true);

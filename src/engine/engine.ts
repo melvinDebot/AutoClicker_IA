@@ -304,7 +304,8 @@ export class Engine {
         throw new Stop('paused', `Le profil affiché ne semble pas être @${u} (capture${readText(profCheck.read, ' : ')}).`);
       }
       // Read the profile again now that it is painted (counters, private notice, story ring).
-      const pr = (await this.waitProfile(u)).profile;
+      const profNow = await this.waitProfile(u);
+      const pr = profNow.profile;
       if (!pr) throw new Stop('paused', 'Profil illisible.');
 
       if (pr.privateNotice) {
@@ -315,7 +316,10 @@ export class Engine {
         this.emit('classify_profile', 'Compte privé · rien à toucher');
       } else {
         result.privacy = 'public';
-        result.story = await this.handleStory(u, prof);
+        // Story: when the setting is on, or as a fallback for accounts without any post.
+        const noPosts = pr.emptyNotice || pr.postsCount === 0;
+        const { likeStory, storyIfNoPosts } = this.ctx.settings;
+        result.story = likeStory || (storyIfNoPosts && noPosts) ? await this.handleStory(u, profNow) : 'skipped';
         const wanted =
           this.ctx.settings.postsPerUser > 0 && !pr.emptyNotice && pr.postsCount !== 0
             ? await this.revealTiles(u, Math.min(this.ctx.settings.postsPerUser, pr.postsCount ?? Number.POSITIVE_INFINITY))
@@ -373,7 +377,6 @@ export class Engine {
 
   private async handleStory(u: string, prof: PageState): Promise<StoryResult> {
     const pr = prof.profile!;
-    if (!this.ctx.settings.likeStory) return 'skipped';
     if (!pr.storyRing || !pr.avatar) return 'none';
     if (this.p.vision.available()) {
       const ring = await this.colors(pr.avatar.box, true);

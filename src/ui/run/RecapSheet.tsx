@@ -34,7 +34,7 @@ export function RecapSheet({ phase, onConfirm, onCancel }: { phase: Recap; onCon
     <Sheet visible title="Récapitulatif" onClose={onCancel}>
       <View style={styles.card}>
         <Line icon="user" label="Compte cible" value={`@${phase.targetAccount}`} />
-        <Line icon="heart" label="Liker la story" value={s.likeStory ? 'Oui' : 'Non'} />
+        <Line icon="heart" label="Liker la story" value={s.likeStory ? 'Oui' : s.storyIfNoPosts ? 'Si aucun post' : 'Non'} />
         <Line icon="grid" label="Posts par compte" value={String(s.postsPerUser)} />
         <Line icon="shield" label="Plafond session" value={`${s.maxLikesPerSession} likes`} />
         <Line icon="shield" label="Plafond du jour" value={`${phase.today} / ${s.maxLikesPerDay} likes`} />

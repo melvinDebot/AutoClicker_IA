@@ -102,6 +102,14 @@ export default function SettingsScreen() {
             value={s.likeStory}
             onChange={(v) => updateSettings({ likeStory: v })}
           />
+          <SwitchRow
+            icon="heart"
+            tone="lavender"
+            title="Story si aucun post"
+            description="Like la story des comptes sans publication, même quand « Liker la story » est désactivé."
+            value={s.storyIfNoPosts}
+            onChange={(v) => updateSettings({ storyIfNoPosts: v })}
+          />
         </SettingBlock>
         <SettingBlock>
           <SettingHeader
