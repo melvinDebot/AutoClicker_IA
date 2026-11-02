@@ -14,6 +14,8 @@ export interface PagePort {
   scrollList(dy: number): Promise<void>;
   /** Scrolls the page itself (profile grid below the header). */
   scrollPage(dy: number): Promise<void>;
+  /** Brings the post / story heart into view. False when the page has none. */
+  revealHeart(): Promise<boolean>;
   /** Shows what the engine is about to touch (or would touch, in dry run). */
   highlight(h: Highlight): void;
 }

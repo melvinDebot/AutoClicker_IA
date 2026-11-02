@@ -136,7 +136,7 @@ export default function HomeScreen() {
     if (!__DEV__ || nav.loading || locked) return;
     const t = setTimeout(() => {
       rpc
-        .call<DomDump>(dumpScript(true), 6000)
+        .call<DomDump>(dumpScript(false), 6000) // off-screen elements too (heart below the fold…)
         .then((d) => console.log(`[AC-DUMP] ${JSON.stringify(d)}`))
         .catch(() => {});
     }, 2500);
@@ -255,7 +255,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   top: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10 },
   appIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  iconBtn: { width: HIT, height: HIT, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  // In development, Expo's floating dev-menu button sits in the top-right corner: keep clear of it.
+  iconBtn: { width: HIT, height: HIT, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: __DEV__ ? 56 : 0 },
   iconBtnOn: { backgroundColor: colors.primary },
   frameWrap: { flex: 1, paddingHorizontal: 12 },
   frameWrapDebug: { flex: 1.1 },

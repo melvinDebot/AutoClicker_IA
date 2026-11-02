@@ -45,6 +45,8 @@ export type FakeOptions = {
   lateProfileSnapshots?: number;
   /** Post tiles are below the fold until the profile is scrolled once. */
   tilesBelowFold?: boolean;
+  /** The post heart is below the image until revealed. */
+  heartBelowFold?: boolean;
 };
 
 type Frame =
@@ -81,7 +83,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   taps: string[] = [];
   highlights: Highlight[] = [];
   private pending: string[] = [];
-  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold'>> &
+  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold'>> &
     FakeOptions;
 
   constructor(
@@ -206,7 +208,10 @@ export class FakeInstagram implements PagePort, VisionPort {
       ...base,
       url: `https://www.instagram.com/p/${f.u}-${f.k}/`,
       kind: 'post',
-      post: { like: el(`heart-p:${f.u}:${f.k}`, liked ? 'like_filled' : 'like_empty', { x: 12, y: 560, w: 26, h: 26 }), liked },
+      post:
+        this.o.heartBelowFold && !this.heartRevealed
+          ? { like: null, liked: null }
+          : { like: el(`heart-p:${f.u}:${f.k}`, liked ? 'like_filled' : 'like_empty', { x: 12, y: 560, w: 26, h: 26 }), liked },
     };
   }
 
@@ -221,6 +226,7 @@ export class FakeInstagram implements PagePort, VisionPort {
         this.stack.push({ kind: 'story', u: a === this.o.storyAdvancesFor ? this.otherThan(a!) : a! });
         break;
       case 'tile':
+        this.heartRevealed = false;
         this.stack.push({ kind: 'post', u: a!, k: Number(b) });
         break;
       case 'heart-s':
@@ -274,8 +280,14 @@ export class FakeInstagram implements PagePort, VisionPort {
   }
 
   pageScrolls = 0;
+  heartRevealed = false;
   async scrollPage(): Promise<void> {
     this.pageScrolls += 1;
+  }
+  async revealHeart(): Promise<boolean> {
+    if (this.frame.kind !== 'post' && this.frame.kind !== 'story') return false;
+    this.heartRevealed = true;
+    return true;
   }
 
   highlight(h: Highlight): void {

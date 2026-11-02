@@ -283,12 +283,16 @@ export class Engine {
     this.mark(pr.avatar.box, 'Story', 'target');
     this.emit('open_story', 'Ouverture de la story');
     await this.tapOrStop(pr.avatar, 'anneau de story');
-    const st = await this.waitFor((s) => s.kind === 'story' && !!s.story, 'story');
+    let st = await this.waitFor((s) => s.kind === 'story' && !!s.story, 'story');
     if (st.story!.username && st.story!.username.toLowerCase() !== u.toLowerCase()) {
       await this.closeStory(st, u);
       return 'error'; // the viewer moved to another account: never like it
     }
     let res: StoryResult;
+    if (!st.story!.like && (await this.p.page.revealHeart())) {
+      await this.sleep(TIMING.afterScroll);
+      st = await this.waitFor((s) => s.kind === 'story' && !!s.story, 'story');
+    }
     const heart = st.story!.like;
     if (!heart) throw new Stop('paused', 'Cœur de la story introuvable.');
     if (st.story!.liked) {
@@ -342,7 +346,12 @@ export class Engine {
     this.mark(tile.box, `Publication ${k + 1}`, 'target');
     this.emit('open_post', `Ouverture de la publication ${k + 1}`);
     await this.tapOrStop(tile, `publication ${k + 1}`);
-    const ps = await this.waitFor((s) => !!s.post, `publication ${k + 1}`);
+    let ps = await this.waitFor((s) => !!s.post, `publication ${k + 1}`);
+    // The heart is usually below the image: bring it into view first.
+    if (!ps.post!.like && (await this.p.page.revealHeart())) {
+      await this.sleep(TIMING.afterScroll);
+      ps = await this.waitFor((s) => !!s.post, `publication ${k + 1}`);
+    }
     const heart = ps.post!.like;
     if (!heart) throw new Stop('paused', `Cœur de la publication ${k + 1} introuvable.`);
     let res: PostResult;

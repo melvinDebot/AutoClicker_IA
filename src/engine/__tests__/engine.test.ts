@@ -152,6 +152,12 @@ describe('Engine — per account rules', () => {
     expect(ig.taps).toContain('tile:user00:1');
   });
 
+  it('brings the post heart into view when it is below the image', async () => {
+    const { results, outcome } = await run(users(2), { heartBelowFold: true }, { postsPerUser: 1, likeStory: false });
+    expect(outcome.status).toBe('done');
+    expect(results.user00!.result?.posts).toEqual(['liked']);
+  });
+
   it('closes a "Not now" window and continues', async () => {
     const { outcome, store } = await run(users(2), { dismissDialogOnce: true }, { postsPerUser: 0 });
     expect(outcome.status).toBe('done');

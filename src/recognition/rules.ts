@@ -3,7 +3,7 @@
 // (Instagram iOS app, English, dark mode). DOM selectors and aria-labels come
 // from the debug screen on the iPhone (step 2).
 
-export const RULES_VERSION = '0.3.3-dom-partly-verified';
+export const RULES_VERSION = '0.4.0-dom-partly-verified';
 export const TEMPLATES_VERSION = '0.1.0-app-ios';
 
 /**

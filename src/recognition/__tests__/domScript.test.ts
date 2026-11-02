@@ -115,6 +115,33 @@ describe('inspectScript', () => {
     expect(list.list?.rows[0]).toMatchObject({ username: 'user01', storyRing: true });
   });
 
+  it('real layout: a story avatar is a span role="link" without href (profile and list)', () => {
+    const p = page(
+      '/martine1.menard/',
+      `<main data-r="0 45 364 905"><div role="button" data-r="16 87 77 77"><span role="link" data-r="16 87 77 77"><img alt="Photo de profil de martine1.menard" data-r="16 87 77 77"></span></div>
+       <h2 data-r="121 84 114 18">martine1.menard</h2></main>`,
+    );
+    expect(p.profile?.storyRing).toBe(true);
+    expect(p.profile?.avatar?.box).toEqual({ x: 16, y: 87, w: 77, h: 77 });
+    const noStory = page(
+      '/bless_dyna2/',
+      `<main data-r="0 45 364 620"><a href="/bless_dyna2/" data-r="16 87 77 77"><img alt="Photo de profil de bless_dyna2" data-r="16 87 77 77"></a></main>`,
+    );
+    expect(noStory.profile?.storyRing).toBe(false);
+    const list = page(
+      '/egliseicc_paris/followers/',
+      `<h1 data-r="80 13 204 18">Followers</h1><main data-r="0 45 364 834">
+         <div data-r="0 215 364 60"><div role="button" data-r="16 221 44 44"><span role="link" data-r="16 221 44 44"><img alt="" data-r="16 221 44 44"></span></div>
+           <a href="/martine1.menard/" data-r="72 224 114 18">martine1.menard</a><button data-r="265 227 82 32">Suivre</button></div>
+         <div data-r="0 275 364 60"><div role="button" data-r="16 281 44 44"><a href="/kaji_dodi6/" data-r="16 281 44 44"><img alt="" data-r="16 281 44 44"></a></div>
+           <a href="/kaji_dodi6/" data-r="72 284 69 18">kaji_dodi6</a><button data-r="265 287 82 32">Suivre</button></div></main>`,
+    );
+    expect(list.list?.rows.map((r) => [r.username, r.storyRing])).toEqual([
+      ['martine1.menard', true],
+      ['kaji_dodi6', false],
+    ]);
+  });
+
   it('reads a private profile', () => {
     const p = page(
       '/user01/',

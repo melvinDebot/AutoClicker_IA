@@ -116,6 +116,14 @@ function storyButton(root, user) {
   }
   return null;
 }
+// SEEN on the iPhone (fr/en): an avatar with a story is wrapped in <span role="link"> (no href)
+// inside a [role="button"]; without a story it is a real <a href="/<user>/">.
+function storyAvatar(img) {
+  if (!img) return null;
+  var l = img.closest('a[href],[role="link"]');
+  if (!l || l.tagName === 'A') return null;
+  return img.closest('[role="button"]') || l;
+}
 function containsText(el, list) { var t = norm(el.innerText || el.textContent); return list.filter(function (w) { return t.indexOf(w) >= 0; })[0] || null; }
 
 var path = location.pathname;
@@ -199,7 +207,7 @@ if (seg[1] === 'followers' || titleEls.length) {
       var cb = rectOf(canvases[c]);
       if (cb.x <= ab.x + ab.w / 2 && cb.x + cb.w >= ab.x + ab.w / 2 && cb.y <= ab.y + ab.h / 2 && cb.y + cb.h >= ab.y + ab.h / 2) ring = true;
     }
-    var sb = storyButton(row, u);
+    var sb = storyButton(row, u) || storyAvatar(row.querySelector('img'));
     if (sb) { ring = true; ab = rectOf(sb); }
     else if (ring && canvases[0]) ab = rectOf(canvases[0]);
     rows.push({ username: u, link: reg1(nameLink, 'user_row'), box: rb, avatar: ab, storyRing: ring,
@@ -234,7 +242,7 @@ if (seg.length === 1 && R.reserved.indexOf((seg[0] || '').toLowerCase()) < 0) {
       if (cb2.x <= ab2.x + ab2.w / 2 && cb2.x + cb2.w >= ab2.x + ab2.w / 2 && cb2.y <= ab2.y + ab2.h / 2 && cb2.y + cb2.h >= ab2.y + ab2.h / 2) { storyRing = true; ringBox = cb2; }
     }
   }
-  var profileStory = storyButton(header, seg[0]);
+  var profileStory = storyButton(header, seg[0]) || storyAvatar(avatarImg);
   if (profileStory) { storyRing = true; ringBox = rectOf(profileStory); }
   var priv = textEls(L.privateNotice, 60);
   var tiles = [], tnodes = document.querySelectorAll('a[href*="/p/"],a[href*="/reel/"]');
@@ -290,6 +298,23 @@ hit.dispatchEvent(new PointerEvent('pointerup', p));
 hit.dispatchEvent(new MouseEvent('mouseup', base));
 hit.dispatchEvent(new MouseEvent('click', base));
 return { ok: true };`;
+}
+
+/** Brings the post / story heart into view (it is often below the image). Returns false if none. */
+export function revealHeartScript(): string {
+  return `
+var R = ${JSON.stringify({ labels: [...DOM.like, ...DOM.unlike], minHeart: DOM.minHeartPx })};
+${HELPERS}
+var labels = R.labels.map(norm), best = null, area = 0;
+var nodes = document.querySelectorAll('[aria-label]');
+for (var i = 0; i < nodes.length; i++) {
+  if (labels.indexOf(norm(nodes[i].getAttribute('aria-label'))) < 0) continue;
+  var b = rectOf(nodes[i]);
+  if (b.w >= R.minHeart && b.w * b.h > area) { best = nodes[i]; area = b.w * b.h; }
+}
+if (!best) return false;
+best.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+return true;`;
 }
 
 /** Scrolls the page itself (profile), not the followers list container. */
