@@ -3,7 +3,7 @@
 // (Instagram iOS app, English, dark mode). DOM selectors and aria-labels come
 // from the debug screen on the iPhone (step 2).
 
-export const RULES_VERSION = '0.4.0-dom-partly-verified';
+export const RULES_VERSION = '0.5.0-dom-partly-verified';
 export const TEMPLATES_VERSION = '0.1.0-app-ios';
 
 /**
@@ -45,6 +45,11 @@ export const TEXT = {
 
 export const INSTAGRAM_HOSTS = ['www.instagram.com', 'instagram.com', 'm.instagram.com'] as const;
 export const START_URL = 'https://www.instagram.com/';
+/**
+ * DEVELOPMENT ONLY: the local fake Instagram (`node tools/fixture-server.mjs`), read with the same
+ * rules as Instagram so that the engine can be tried on the simulator without touching the account.
+ */
+export const DEV_FIXTURE_ORIGIN = 'http://localhost:8099';
 
 /**
  * Paths where no JavaScript is ever injected: sign-in, account checks and
@@ -127,7 +132,7 @@ export const VISUAL = {
   ringGrey: 0.3,
 } as const;
 
-/** Engine timings (ms). Plain waits for screens, no randomised "human" delays. */
+/** Engine timings (ms): waits for screens. The pauses between accounts are PACES (engine/settings.ts). */
 export const TIMING = {
   poll: 350,
   screenTimeout: 9000,

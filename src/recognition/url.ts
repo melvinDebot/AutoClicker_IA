@@ -1,4 +1,4 @@
-import { INSTAGRAM_HOSTS, NO_INJECTION_PATH_PREFIXES, RESERVED_SEGMENTS } from './rules';
+import { DEV_FIXTURE_ORIGIN, INSTAGRAM_HOSTS, NO_INJECTION_PATH_PREFIXES, RESERVED_SEGMENTS } from './rules';
 
 export type PageKind =
   | 'login'
@@ -28,9 +28,15 @@ export function isInstagramHost(host: string): boolean {
   return (INSTAGRAM_HOSTS as readonly string[]).includes(host.toLowerCase());
 }
 
+/** Instagram over https, or the local fake Instagram in development builds. */
+function isInstagramPage(u: URL): boolean {
+  if (u.protocol === 'https:' && isInstagramHost(u.hostname)) return true;
+  return typeof __DEV__ !== 'undefined' && __DEV__ && u.origin === DEV_FIXTURE_ORIGIN;
+}
+
 export function parseInstagramUrl(raw: string): ParsedUrl {
   const u = safeUrl(raw);
-  if (!u || u.protocol !== 'https:' || !isInstagramHost(u.hostname)) return { kind: 'external' };
+  if (!u || !isInstagramPage(u)) return { kind: 'external' };
   const path = u.pathname;
   if (path.startsWith('/accounts/login') || path === '/login' || path.startsWith('/login/')) return { kind: 'login' };
   if (NO_INJECTION_PATH_PREFIXES.some((p) => path.startsWith(p))) return { kind: 'account_check' };

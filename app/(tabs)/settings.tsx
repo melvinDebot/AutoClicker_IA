@@ -6,8 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { resetSettings, updateSettings, useSettings } from '@/adapters/settings';
 import { seedDemoSessions } from '@/adapters/store/demoData';
 import { likesToday, wipeAllData } from '@/adapters/store/repo';
-import { CAP_LIMITS } from '@/engine/settings';
-import type { AutoStop, PostsPerUser } from '@/engine/types';
+import { lastInstagramWarning } from '@/adapters/store/sessionStore';
+import { CAP_LIMITS, cooldownUntil, PACES, paceRange } from '@/engine/settings';
+import { formatDateTime } from '@/engine/stats';
+import type { AutoStop, Pace, PostsPerUser } from '@/engine/types';
 import { RULES_VERSION, TEMPLATES_VERSION } from '@/recognition/rules';
 import {
   Button,
@@ -31,6 +33,12 @@ const POSTS: { value: PostsPerUser; label: string }[] = [0, 1, 2, 3].map((n) => 
   label: String(n),
 }));
 
+const PACE_OPTIONS: { value: Pace; label: string; sub: string }[] = (Object.keys(PACES) as Pace[]).map((p) => ({
+  value: p,
+  label: PACES[p].label,
+  sub: paceRange(p),
+}));
+
 const STOPS: { value: AutoStop; label: string }[] = [
   { value: 0, label: 'Jamais' },
   { value: 15, label: '15 min' },
@@ -42,12 +50,15 @@ export default function SettingsScreen() {
   const s = useSettings();
   const toast = useToast();
   const [today, setToday] = useState(0);
+  const [warnedAt, setWarnedAt] = useState<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       likesToday().then(setToday).catch(() => {});
+      lastInstagramWarning().then(setWarnedAt).catch(() => {});
     }, []),
   );
+  const blockedUntil = cooldownUntil(warnedAt, Date.now());
 
   const confirmWipe = () =>
     Alert.alert(
@@ -146,6 +157,15 @@ export default function SettingsScreen() {
         </SettingBlock>
         <SettingBlock>
           <SettingHeader
+            icon="pause"
+            tone="teal"
+            title="Rythme"
+            description="Pause tirée au hasard entre deux comptes, plus une courte pause sur chaque post ou story avant le j’aime. Plus c’est lent, moins Instagram voit d’actions par heure."
+          />
+          <RadioGroup label="Rythme" value={s.pace} options={PACE_OPTIONS} onChange={(v) => updateSettings({ pace: v })} />
+        </SettingBlock>
+        <SettingBlock>
+          <SettingHeader
             icon="db"
             tone="teal"
             title="Sauvegarde automatique"
@@ -168,11 +188,11 @@ export default function SettingsScreen() {
           <SettingHeader
             icon="shield"
             tone="gray"
-            title="Plafonds de likes"
-            description="La session s’arrête dès qu’un plafond est atteint (stories et posts confondus)."
+            title="Objectif et plafond de likes"
+            description="La session s’arrête dès que son objectif est atteint, quel que soit le nombre de comptes (stories et posts confondus). Le plafond du jour compte toutes les sessions."
           />
           <Stepper
-            label="Par session"
+            label="Objectif par session"
             unit="likes"
             value={s.maxLikesPerSession}
             {...CAP_LIMITS.perSession}
@@ -186,6 +206,12 @@ export default function SettingsScreen() {
             onChange={(v) => updateSettings({ maxLikesPerDay: v })}
           />
           <InfoRow label="Likes aujourd’hui" value={`${today} / ${s.maxLikesPerDay}`} />
+          <InfoRow label="Dernier avertissement d’Instagram" value={warnedAt ? formatDateTime(warnedAt) : 'Aucun'} />
+          {blockedUntil ? (
+            <Text size={13} color={colors.dangerText} style={styles.lh}>
+              Aucun vrai like avant le {formatDateTime(blockedUntil)} (48 h après l’avertissement). L’essai à blanc reste possible.
+            </Text>
+          ) : null}
         </SettingBlock>
 
         <SectionHeader title="Repérage" />

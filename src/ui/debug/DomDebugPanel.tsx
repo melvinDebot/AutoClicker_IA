@@ -18,12 +18,14 @@ type Props = {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onClose: () => void;
+  /** Opens the local fake Instagram (simulator tests without touching the account). */
+  onFixture: () => void;
 };
 
 const describe = (e: DumpElement) =>
   [e.label ? `« ${e.label} »` : null, e.text && e.text !== e.label ? e.text : null, e.href].filter(Boolean).join(' · ');
 
-export function DomDebugPanel({ rpc, getViewTag, dump, onDump, selectedId, onSelect, onClose }: Props) {
+export function DomDebugPanel({ rpc, getViewTag, dump, onDump, selectedId, onSelect, onClose, onFixture }: Props) {
   const [onlyVisible, setOnlyVisible] = useState<'visible' | 'all'>('visible');
   const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState(false);
@@ -126,6 +128,7 @@ export function DomDebugPanel({ rpc, getViewTag, dump, onDump, selectedId, onSel
         <Button label="Capture" size="sm" variant="dark" icon="camera" onPress={capture} disabled={busy} style={styles.flex} />
         <Button label="Exporter" size="sm" variant="dark" onPress={exportDump} disabled={!dump} style={styles.flex} />
       </View>
+      <Button label="Liste factice (sans Instagram)" size="sm" variant="dark" icon="grid" onPress={onFixture} />
       <Text size={12.5} color={colors.textSoft} accessibilityLiveRegion="polite">
         {status}
       </Text>

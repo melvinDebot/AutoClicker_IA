@@ -6,7 +6,7 @@ import { AppState } from 'react-native';
 
 import { getSettings } from '@/adapters/settings';
 import { likesToday } from '@/adapters/store/repo';
-import { createSession, findResumable, sqliteStore, updateSessionSettings } from '@/adapters/store/sessionStore';
+import { createSession, findResumable, lastInstagramWarning, sqliteStore, updateSessionSettings } from '@/adapters/store/sessionStore';
 import type { SessionRow } from '@/adapters/store/schema';
 import { createVisionPort, realClock } from '@/adapters/vision';
 import { Engine } from '@/engine/engine';
@@ -42,6 +42,8 @@ export type Phase =
       visibleRows: number;
       resumable: SessionRow | null;
       today: number;
+      /** Last Instagram warning met by a run: no real like for 48 h after it. */
+      lastWarning: number | null;
       settings: Settings;
       visionReady: boolean;
     }
@@ -74,10 +76,11 @@ export function useRunner(deps: { page: PagePort; getViewTag: () => number | nul
     let r: Awaited<ReturnType<Engine['scan']>>;
     let resumable: SessionRow | null;
     let today: number;
+    let lastWarning: number | null;
     try {
       [r] = await Promise.all([engine.scan(), realClock.sleep(900)]);
       if (!r.ok) return fail(r.message, r.checks);
-      [resumable, today] = await Promise.all([findResumable(r.targetAccount), likesToday()]);
+      [resumable, today, lastWarning] = await Promise.all([findResumable(r.targetAccount), likesToday(), lastInstagramWarning()]);
       // A dry-run session is never resumed for real (its accounts were not liked), and vice versa.
       if (resumable && sessionDryRun(resumable.settingsJson) !== getSettings().dryRun) resumable = null;
     } catch (e) {
@@ -91,6 +94,7 @@ export function useRunner(deps: { page: PagePort; getViewTag: () => number | nul
       visibleRows: r.visibleRows,
       resumable,
       today,
+      lastWarning,
       settings: getSettings(),
       visionReady: vision.available(),
     });

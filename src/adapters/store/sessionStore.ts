@@ -54,6 +54,12 @@ export async function updateSessionSettings(id: string, settings: Settings, now 
   await db.update(sessions).set({ settingsJson: JSON.stringify(settings), rulesVersion: RULES_VERSION, updatedAt: now }).where(eq(sessions.id, id));
 }
 
+/** Time of the last Instagram warning met by a run (all sessions), null if none. */
+export async function lastInstagramWarning(): Promise<number | null> {
+  const [row] = await db.select({ at: sql<number | null>`max(${events.at})` }).from(events).where(eq(events.type, 'instagram_warning'));
+  return row?.at ?? null;
+}
+
 export const sqliteStore: StorePort = {
   async loadUsers(sessionId) {
     const rows = await db.select({ username: sessionUsers.username, state: sessionUsers.state }).from(sessionUsers).where(eq(sessionUsers.sessionId, sessionId));
@@ -129,6 +135,10 @@ export const sqliteStore: StorePort = {
       .where(eq(sessions.id, sessionId));
     const day = await db.select().from(dailyCounters).where(eq(dailyCounters.date, dayKey(now))).get();
     return { session: s?.n ?? 0, today: day ? day.likesStory + day.likesPost : 0 };
+  },
+
+  async lastWarningAt() {
+    return lastInstagramWarning();
   },
 
   async event(sessionId, type, payload, now) {

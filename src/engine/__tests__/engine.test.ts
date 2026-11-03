@@ -1,4 +1,4 @@
-import { Engine } from '../engine';
+import { Engine, LIST_EMPTY } from '../engine';
 import type { Progress, RunContext } from '../ports';
 import { FakeClock, FakeInstagram, MemoryStore, type FakeOptions, type FakeUser } from '../testing/fakeInstagram';
 import { DEFAULT_SETTINGS, type Settings } from '../types';
@@ -13,15 +13,16 @@ async function run(
   list: FakeUser[],
   opts: FakeOptions = {},
   settings: Partial<Settings> = {},
-  setup: (x: { ig: FakeInstagram; store: MemoryStore; ctrl: AbortController }) => void = () => {},
+  setup: (x: { ig: FakeInstagram; store: MemoryStore; ctrl: AbortController; clock: FakeClock }) => void = () => {},
+  random: () => number = () => 0.5,
 ) {
   const ig = new FakeInstagram('atelier.lumen', list, opts);
   const store = new MemoryStore();
   const clock = new FakeClock();
   const ctrl = new AbortController();
-  setup({ ig, store, ctrl });
+  setup({ ig, store, ctrl, clock });
   const progress: Progress[] = [];
-  const engine = new Engine({ page: ig, vision: ig, store, clock });
+  const engine = new Engine({ page: ig, vision: ig, store, clock, random });
   const ctx: RunContext = {
     sessionId: SID,
     targetAccount: 'atelier.lumen',
@@ -31,7 +32,7 @@ async function run(
     onProgress: (p) => progress.push(p),
   };
   const outcome = await engine.run(ctx);
-  return { outcome, ig, store, progress, results: store.results(SID) };
+  return { outcome, ig, store, clock, progress, results: store.results(SID) };
 }
 
 const opened = (ig: FakeInstagram, u: string) => ig.taps.filter((t) => t === `row:${u}`).length;
@@ -64,7 +65,7 @@ describe('Engine — full run', () => {
     const first = ig.rowTags.find((t) => t && t.length > 0)!;
     expect(first[0]!.label).toBe('Suivant');
     expect(first.slice(1).every((t) => t.label === 'À traiter')).toBe(true);
-    const later = ig.rowTags.filter((t): t is NonNullable<typeof t> => !!t && t.length > 0)[3]!;
+    const later = ig.rowTags.find((t) => t?.[3]?.label === 'Suivant')!;
     expect(later.filter((t) => t.label === 'Ignoré').length).toBe(3); // nothing to like (0 post, no story)
     expect(ig.rowTags[ig.rowTags.length - 1]).toBeNull(); // hidden at the end
   });
@@ -254,11 +255,35 @@ describe('Engine — stops', () => {
     expect(results.user00!.state).toBe('todo'); // nothing sent: will be retried on resume
   });
 
-  it('stops at the session cap with exactly that many likes', async () => {
+  it('stops at the session target with exactly that many likes', async () => {
     const { outcome, ig } = await run(users(10), {}, { maxLikesPerSession: 4, postsPerUser: 2 });
     expect(outcome.status).toBe('paused');
-    expect(outcome.reason).toMatch(/Plafond de la session atteint \(4 likes\)/);
+    expect(outcome.reason).toBe('Objectif de la session atteint (4 likes).');
     expect(ig.likesSent).toBe(4);
+  });
+
+  it('target reached at the end of an account: stops without opening another profile', async () => {
+    const { outcome, ig, progress } = await run(users(10), {}, { maxLikesPerSession: 4, postsPerUser: 2, likeStory: false });
+    expect(outcome.reason).toBe('Objectif de la session atteint (4 likes).');
+    expect(ig.likesSent).toBe(4);
+    expect(opened(ig, 'user02')).toBe(0);
+    expect(progress[progress.length - 1]!.sessionLikes).toBe(4);
+  });
+
+  it('counts the likes of earlier runs of the session against its target', async () => {
+    const { outcome, ig, progress } = await run(users(10), {}, { maxLikesPerSession: 5, postsPerUser: 2, likeStory: false }, ({ store }) =>
+      store.likes.set(SID, 3),
+    );
+    expect(outcome.reason).toBe('Objectif de la session atteint (5 likes).');
+    expect(ig.likesSent).toBe(2);
+    expect(progress[progress.length - 1]!.sessionLikes).toBe(5);
+  });
+
+  it('dry run: stops at the target with simulated likes, none sent', async () => {
+    const { outcome, ig } = await run(users(10), {}, { dryRun: true, maxLikesPerSession: 3, postsPerUser: 1, likeStory: false });
+    expect(outcome.reason).toBe('Objectif de la session atteint (3 likes simulés).');
+    expect(ig.likesSent).toBe(0);
+    expect(opened(ig, 'user03')).toBe(0);
   });
 
   it('stops at the daily cap, counting likes of other sessions', async () => {
@@ -291,6 +316,32 @@ describe('Engine — stops', () => {
     expect(ig.stack).toEqual([{ kind: 'followers' }]);
   });
 
+  it('refuses real likes for 48 h after an Instagram warning, dry run still possible', async () => {
+    const warned = ({ store, clock }: { store: MemoryStore; clock: FakeClock }) =>
+      store.events.push({ type: 'instagram_warning', payload: {}, at: clock.t - 3 * 3600_000 });
+    const real = await run(users(5), {}, { postsPerUser: 1 }, warned);
+    expect(real.outcome.status).toBe('paused');
+    expect(real.outcome.reason).toMatch(/^Instagram a limité le compte le .* aucun vrai like avant le /);
+    expect(real.ig.taps).toEqual([]);
+    const dry = await run(users(5), {}, { postsPerUser: 1, dryRun: true }, warned);
+    expect(dry.outcome.status).toBe('done');
+    const later = await run(users(5), {}, { postsPerUser: 1 }, ({ store, clock }) =>
+      store.events.push({ type: 'instagram_warning', payload: {}, at: clock.t - 49 * 3600_000 }),
+    );
+    expect(later.outcome.status).toBe('done');
+    expect(later.ig.likesSent).toBeGreaterThan(0);
+  });
+
+  it('a warning met during the run blocks the next real run', async () => {
+    const { store } = await run(users(10), { warningAfterLikes: 1 }, { postsPerUser: 2 });
+    expect(await store.lastWarningAt()).not.toBeNull();
+  });
+
+  it('explains a list whose accounts never load (Instagram limit) instead of a generic error', async () => {
+    const { outcome } = await run([], {}, {});
+    expect(outcome).toEqual({ status: 'paused', reason: LIST_EMPTY });
+  });
+
   it('stays where it is after an Instagram warning', async () => {
     const { ig } = await run(users(10), { warningAfterLikes: 1 }, { postsPerUser: 2 });
     expect(ig.stack.length).toBeGreaterThan(1);
@@ -307,11 +358,105 @@ describe('Engine — stops', () => {
   });
 });
 
+describe('Engine — pace', () => {
+  it('pauses on the list between two accounts, for a duration drawn in the chosen range', async () => {
+    const { progress } = await run(users(3), {}, { postsPerUser: 0, likeStory: false, storyIfNoPosts: false, pace: 'slow' });
+    const pauses = progress.filter((p) => p.step === 'pause');
+    expect(pauses).toHaveLength(2); // none before the first account
+    expect(pauses[0]!.text).toBe('Pause de 33 s · suivant : @user01'); // 20 + 0.5 × 25 s
+  });
+
+  it('draws every pause inside its range, from the shortest to the longest', async () => {
+    for (const r of [0, 0.999]) {
+      const sleeps: number[] = [];
+      await run(
+        users(2),
+        {},
+        { postsPerUser: 1, likeStory: true, pace: 'normal' },
+        ({ clock }) => {
+          const sleep = clock.sleep.bind(clock);
+          clock.sleep = async (ms: number) => {
+            sleeps.push(ms);
+            return sleep(ms);
+          };
+        },
+        () => r,
+      );
+      expect(sleeps.filter((ms) => ms >= 8_000)).toEqual([r === 0 ? 8_000 : 19_988]); // between the 2 accounts
+      expect(sleeps).toContain(r === 0 ? 1_500 : 3_498); // on each post
+      expect(sleeps).toContain(r === 0 ? 800 : 1_999); // on each story
+    }
+  });
+
+  it('a manual stop during a pause ends the run at once', async () => {
+    let ctrlRef: AbortController | null = null;
+    const { outcome, results } = await run(users(5), {}, { postsPerUser: 0, likeStory: false }, ({ ctrl, clock }) => {
+      ctrlRef = ctrl;
+      const sleep = clock.sleep.bind(clock);
+      clock.sleep = async (ms: number) => {
+        if (ms >= 20_000) ctrlRef!.abort('manual');
+        return sleep(ms);
+      };
+    });
+    expect(outcome).toEqual({ status: 'paused', reason: 'Arrêtée par vous' });
+    expect(results.user00!.state).toBe('done');
+    expect(results.user01!.state).toBe('todo');
+  });
+});
+
+describe('Engine — overlay', () => {
+  it('highlights the row and tags where the list is now, not where it was while sliding in', async () => {
+    const { ig } = await run(users(4), { listSlidesIn: 1 }, { postsPerUser: 0, likeStory: false });
+    expect(ig.highlights.find((h) => h?.label === '@user00')?.box.y).toBe(120);
+    const shown = ig.rowTags.filter((t): t is NonNullable<typeof t> => !!t && t.length > 0);
+    const beforeTap = shown.filter((t) => t[0]!.label === 'Suivant').pop()!;
+    expect(beforeTap[0]!.row.y).toBe(120);
+    expect(beforeTap[0]!.name).toEqual({ x: 70, y: 133, w: 48, h: 18 });
+  });
+});
+
+describe('Engine — one engine, several runs (as in the app)', () => {
+  it('starts every run from zero: target, counters and pauses of the previous run do not carry over', async () => {
+    const ig = new FakeInstagram('atelier.lumen', users(10));
+    const store = new MemoryStore();
+    const clock = new FakeClock();
+    const engine = new Engine({ page: ig, vision: ig, store, clock, random: () => 0.5 });
+    const ctx = (sessionId: string, progress: Progress[]): RunContext => ({
+      sessionId,
+      targetAccount: 'atelier.lumen',
+      settings: { ...DEFAULT_SETTINGS, dryRun: true, autoStopMin: 0, postsPerUser: 1, likeStory: false, maxLikesPerSession: 2 },
+      previousElapsedMs: 0,
+      signal: new AbortController().signal,
+      onProgress: (p) => progress.push(p),
+    });
+    const first: Progress[] = [];
+    expect((await engine.run(ctx('a', first))).reason).toBe('Objectif de la session atteint (2 likes simulés).');
+    const second: Progress[] = [];
+    expect((await engine.run(ctx('b', second))).reason).toBe('Objectif de la session atteint (2 likes simulés).');
+    expect(second.filter((p) => p.step === 'pause')).toHaveLength(1); // none before its first account
+    expect(second[second.length - 1]!.dryLikes).toBe(2);
+  });
+});
+
+describe('Engine — overlay on the profile', () => {
+  it('clears the tile highlight once the post is open (it would stay over the post during the pause)', async () => {
+    const { ig } = await run(users(1), {}, { postsPerUser: 1, likeStory: false, dryRun: true });
+    const i = ig.highlights.findIndex((h) => h?.label === 'Publication 1');
+    expect(ig.highlights[i + 1]).toBeNull();
+  });
+});
+
 describe('Engine — scan', () => {
   it('accepts a followers list with rows and a back button', async () => {
     const ig = new FakeInstagram('atelier.lumen', users(8));
     const r = await new Engine({ page: ig, vision: ig, store: new MemoryStore(), clock: new FakeClock() }).scan();
     expect(r).toMatchObject({ ok: true, targetAccount: 'atelier.lumen', visibleRows: 7 });
+  });
+
+  it('says so when the list is open but its accounts never show (grey placeholders)', async () => {
+    const ig = new FakeInstagram('atelier.lumen', []);
+    const r = await new Engine({ page: ig, vision: ig, store: new MemoryStore(), clock: new FakeClock() }).scan();
+    expect(r).toMatchObject({ ok: false, message: expect.stringMatching(/aucun compte ne s’affiche.*24 à 48 h/) });
   });
 
   it('refuses any other screen with the expected message', async () => {

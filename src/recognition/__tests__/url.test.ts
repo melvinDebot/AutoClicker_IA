@@ -17,6 +17,9 @@ describe('parseInstagramUrl', () => {
     ['https://www.instagram.com/explore/', { kind: 'other' }],
     ['https://www.facebook.com/login.php', { kind: 'external' }],
     ['http://www.instagram.com/atelier.lumen/', { kind: 'external' }],
+    // Development builds only: the local fake Instagram on this exact origin, nothing else on localhost.
+    ['http://localhost:8099/ac.fixture/followers/', { kind: 'followers', username: 'ac.fixture' }],
+    ['http://localhost:8098/ac.fixture/followers/', { kind: 'external' }],
     ['not a url', { kind: 'external' }],
   ])('%s', (url, expected) => {
     expect(parseInstagramUrl(url)).toEqual(expected);

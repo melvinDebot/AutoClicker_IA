@@ -16,6 +16,12 @@ export function parsePostResults(json: string | null | undefined): PostResult[] 
   }
 }
 
+/** "1 like", "5 likes", "1 like simulé", "5 likes simulés". */
+export function likesText(n: number, simulated = false): string {
+  const s = n > 1 ? 's' : '';
+  return `${n} like${s}${simulated ? ` simulé${s}` : ''}`;
+}
+
 /** 75 s → "1:15", 3 725 s → "1:02:05". */
 export function formatDuration(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

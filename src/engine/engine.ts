@@ -4,6 +4,8 @@ import type { DomEl, ListRow, PageState } from '@/recognition/page';
 import { DOM, TEXT, TIMING, VISUAL } from '@/recognition/rules';
 import { textMatches, usernameMatches, usernamePrefixMatches } from '@/recognition/text';
 import type { Highlight, Ports, Progress, RowTag, RunContext, RunOutcome, ScanResult, Step, UserResult } from './ports';
+import { cooldownUntil, PACES, STORY_PAUSE } from './settings';
+import { formatDateTime, likesText } from './stats';
 import type { Box, PostResult, StoryResult } from './types';
 
 /** Ends a run: `done` (end of the list) or `paused` (everything else, resumable). */
@@ -23,6 +25,10 @@ export const ABORT_REASONS: Record<string, string> = {
 };
 
 export const SCAN_FAIL = 'Ouvrez la liste des abonnés d’un compte dans la WebView.';
+
+/** The list page is there but its rows never come (grey placeholders): usually an Instagram limit. */
+export const LIST_EMPTY =
+  'Instagram n’affiche plus les comptes de la liste (chargement sans fin). C’est souvent une limite temporaire du compte : ne relancez pas tout de suite, attendez 24 à 48 h.';
 
 const AUTO_STOP_LABEL: Record<number, string> = { 15: '15 min', 30: '30 min', 60: '1 h' };
 
@@ -66,6 +72,10 @@ export class Engine {
   private catchUp = new Set<string>();
   private current: string | null = null;
   private processedThisRun = 0;
+  /** Likes of this session sent by earlier runs (resume), for the target shown in the HUD. */
+  private likesBefore = 0;
+  /** An account was just handled: pause on the list before the next one. */
+  private restDue = false;
 
   constructor(private readonly p: Ports) {}
 
@@ -87,6 +97,13 @@ export class Engine {
     ];
     if (!s) return { ok: false, message: 'La page ne répond pas. Rechargez-la puis réessayez.', checks };
     if (s.warning) return { ok: false, message: `Avertissement d’Instagram à l’écran : « ${s.warning} ».`, checks };
+    if (s.kind === 'followers' && s.list && rows === 0) {
+      return {
+        ok: false,
+        message: 'La liste est ouverte mais aucun compte ne s’affiche. Si elle reste grise, Instagram limite probablement votre compte : attendez 24 à 48 h.',
+        checks,
+      };
+    }
     if (!s.list || rows === 0 || !s.back || !s.username) return { ok: false, message: SCAN_FAIL, checks };
 
     // Visual confirmation: the title (or a row) must be readable on the snapshot.
@@ -111,11 +128,23 @@ export class Engine {
     this.ctx = ctx;
     const { store, clock } = this.p;
     const sid = ctx.sessionId;
+    this.resetRun();
     this.startedAt = clock.now();
     let outcome: RunOutcome = { status: 'paused', reason: 'Arrêt' };
     try {
       if (!ctx.settings.dryRun && !this.p.vision.available()) {
         throw new Stop('paused', 'Module de vision absent : reconstruire le dev build avant une exécution réelle.');
+      }
+      if (!ctx.settings.dryRun) {
+        const w = await store.lastWarningAt();
+        const until = cooldownUntil(w, clock.now());
+        if (w !== null && until !== null) {
+          throw new Stop(
+            'paused',
+            `Instagram a limité le compte le ${formatDateTime(w)} : aucun vrai like avant le ${formatDateTime(until)}. L’essai à blanc reste possible.`,
+          );
+        }
+        this.likesBefore = (await store.likeCounts(sid, clock.now())).session;
       }
       this.known = await store.loadUsers(sid);
       for (const [u, st] of this.known) if (st === 'processing') this.known.set(u, 'todo');
@@ -124,6 +153,8 @@ export class Engine {
       await store.updateSession(sid, { status: 'running', endReason: null }, clock.now());
       await store.event(sid, 'run_start', { dryRun: ctx.settings.dryRun, resumeFrom: this.processed }, clock.now());
       await this.checkCaps();
+      // The WebView has just gone full screen: let the page lay itself out again before reading it.
+      await this.sleep(TIMING.settle);
       await this.loop();
     } catch (e) {
       outcome =
@@ -154,16 +185,20 @@ export class Engine {
     let emptyScrolls = 0;
     let scrollsWithoutNew = 0;
     let lastTop = 0;
+    const listReady = (st: PageState) => !!st.list && st.list.rows.length > 0;
+    const listEmpty = (st: PageState) => (st.kind === 'followers' && st.list && st.list.rows.length === 0 ? LIST_EMPTY : null);
     for (;;) {
       this.checkpoint();
-      let s = await this.waitFor((st) => !!st.list && st.list.rows.length > 0, 'liste d’abonnés');
+      // Target reached: stop here, without opening one more profile.
+      await this.checkCaps();
+      let s = await this.waitFor(listReady, 'liste d’abonnés', listEmpty);
       // Instagram puts the list back at the top after each profile: go back to where we were.
       const top = s.list?.scroll.top ?? 0;
       if (lastTop > 0 && top < 5) {
         this.emit('scroll', 'Retour à la position dans la liste');
         await this.p.page.scrollList(lastTop - top);
         await this.sleep(TIMING.afterScroll);
-        s = await this.waitFor((st) => !!st.list && st.list.rows.length > 0, 'liste d’abonnés');
+        s = await this.waitFor(listReady, 'liste d’abonnés', listEmpty);
       }
       lastTop = 0;
       if (s.username && s.username.toLowerCase() !== this.ctx.targetAccount.toLowerCase()) {
@@ -179,10 +214,15 @@ export class Engine {
         if (this.known.get(r.username) !== 'todo') this.catchUp.add(r.username);
       }
       if (next) {
+        if (this.restDue) {
+          await this.rest(next);
+          continue; // read the list again: it may have moved during the pause
+        }
         emptyScrolls = 0;
         scrollsWithoutNew = 0;
         lastTop = s.list?.scroll.top ?? 0;
         await this.processUser(next);
+        this.restDue = true;
         continue;
       }
 
@@ -284,6 +324,8 @@ export class Engine {
       await store.event(sid, 'row_mismatch', { username: u, box: row.link.box, read: rowCheck.read, diag }, clock.now());
       throw new Stop('paused', `Le nom lu sur la capture${readText(rowCheck.read)} ne correspond pas au DOM (@${u}).`);
     }
+    // Highlight and tags from where the row is now, once the list stopped moving.
+    row = await this.settledRow(row);
     await store.markProcessing(sid, u);
     this.known.set(u, 'processing');
 
@@ -388,6 +430,9 @@ export class Engine {
     this.mark(pr.avatar.box, 'Story', 'target');
     this.emit('open_story', 'Ouverture de la story');
     await this.tapOrStop(pr.avatar, 'anneau de story');
+    this.mark(null); // the avatar highlight must not stay over the story
+    // Short look at the story before its heart is read (it moves on by itself after a few seconds).
+    await this.sleep(this.draw(STORY_PAUSE));
     let st = await this.waitHeart('story', (s) => (s.kind === 'story' ? s.story : null));
     if (st.story!.username && st.story!.username.toLowerCase() !== u.toLowerCase()) {
       await this.closeStory(st, u);
@@ -447,6 +492,8 @@ export class Engine {
     this.mark(tile.box, `Publication ${k + 1}`, 'target');
     this.emit('open_post', `Ouverture de la publication ${k + 1}`);
     await this.tapOrStop(tile, `publication ${k + 1}`);
+    this.mark(null); // the tile highlight must not stay over the post
+    await this.sleep(this.draw(PACES[this.ctx.settings.pace].onPost));
     const ps = await this.waitHeart(`publication ${k + 1}`, (s) => s.post);
     const heart = ps.post!.like;
     if (!heart) throw new Stop('paused', `Cœur de la publication ${k + 1} introuvable (${pathOf(ps.url)}).`);
@@ -482,6 +529,7 @@ export class Engine {
       throw new Stop('paused', `Le cœur de ${label} paraît déjà rempli sur la capture : rien touché.`);
     }
     if (this.ctx.settings.dryRun) {
+      await this.checkCaps();
       this.dryLikes += 1;
       this.mark(heart.box, 'J’aime (essai à blanc)', 'dry');
       this.emit(step, `Essai à blanc : j’aime sur ${label} non envoyé`, `${kind === 'story' ? 'Story' : 'Post'} : like simulé`);
@@ -577,8 +625,8 @@ export class Engine {
     return { ok: false, read };
   }
 
-  /** Waits for a precise screen. Not there twice in a row → pause. */
-  private async waitFor(pred: (s: PageState) => boolean, what: string): Promise<PageState> {
+  /** Waits for a precise screen. Not there twice in a row → pause, with `why` explaining the last page if it can. */
+  private async waitFor(pred: (s: PageState) => boolean, what: string, why?: (s: PageState) => string | null): Promise<PageState> {
     let last: PageState | null = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       const deadline = this.p.clock.now() + TIMING.screenTimeout;
@@ -590,6 +638,11 @@ export class Engine {
         if (last && pred(last)) return last;
         await this.sleep(TIMING.poll);
       }
+    }
+    const explained = last && why ? why(last) : null;
+    if (explained) {
+      await this.p.store.event(this.ctx.sessionId, 'screen_missing', { what, url: last?.url, reason: explained }, this.p.clock.now());
+      throw new Stop('paused', explained);
     }
     throw new Stop(
       'paused',
@@ -678,16 +731,69 @@ export class Engine {
     }
   }
 
+  /** Session target (simulated likes count in dry run) and daily cap (real likes only). */
   private async checkCaps(): Promise<void> {
-    if (this.ctx.settings.dryRun) return;
+    const target = this.ctx.settings.maxLikesPerSession;
+    if (this.ctx.settings.dryRun) {
+      if (this.dryLikes >= target) throw new Stop('paused', `Objectif de la session atteint (${likesText(target, true)}).`);
+      return;
+    }
     const c = await this.p.store.likeCounts(this.ctx.sessionId, this.p.clock.now());
     const pending = this.pending.story + this.pending.post;
-    if (c.session + pending >= this.ctx.settings.maxLikesPerSession) {
-      throw new Stop('paused', `Plafond de la session atteint (${this.ctx.settings.maxLikesPerSession} likes).`);
+    if (c.session + pending >= target) {
+      throw new Stop('paused', `Objectif de la session atteint (${likesText(target)}).`);
     }
     if (c.today + pending >= this.ctx.settings.maxLikesPerDay) {
-      throw new Stop('paused', `Plafond du jour atteint (${this.ctx.settings.maxLikesPerDay} likes).`);
+      throw new Stop('paused', `Plafond du jour atteint (${likesText(this.ctx.settings.maxLikesPerDay)}).`);
     }
+  }
+
+  /** The app keeps one engine for every run: nothing of the previous run counts in this one. */
+  private resetRun() {
+    this.known = new Map();
+    this.outcomes = new Map();
+    this.processed = 0;
+    this.discovered = 0;
+    this.windowIndex = 0;
+    this.likes = { story: 0, post: 0 };
+    this.pending = { story: 0, post: 0 };
+    this.dryLikes = 0;
+    this.catchUp = new Set();
+    this.current = null;
+    this.processedThisRun = 0;
+    this.likesBefore = 0;
+    this.restDue = false;
+  }
+
+  /** Random pause on the list between two accounts (Réglages › Rythme). */
+  private async rest(next: ListRow): Promise<void> {
+    this.restDue = false;
+    const ms = this.draw(PACES[this.ctx.settings.pace].between);
+    this.emit('pause', `Pause de ${Math.round(ms / 1000)} s · suivant : @${next.username}`);
+    await this.sleep(ms);
+  }
+
+  /** A duration drawn at random in [min, max] ms. */
+  private draw([min, max]: readonly [number, number]): number {
+    return Math.round(min + (this.p.random ?? Math.random)() * (max - min));
+  }
+
+  /**
+   * The row as it is now: reads the list again until the row stays put (scroll restored late, rows
+   * loading above it), redrawing the tags each time. Gone from the screen → the last known row.
+   */
+  private async settledRow(row: ListRow): Promise<ListRow> {
+    let prev = row;
+    for (let i = 0; i < 4; i++) {
+      const rows = this.visibleRows(await this.inspectGuarded());
+      const now = rows.find((r) => r.username === row.username);
+      if (!now) return prev;
+      this.tagRows(rows, now);
+      if (Math.abs(now.box.y - prev.box.y) <= 2) return now;
+      prev = now;
+      await this.sleep(TIMING.poll);
+    }
+    return prev;
   }
 
   private checkpoint(): void {
@@ -728,17 +834,18 @@ export class Engine {
   /** Tags of the visible rows, from what the engine already knows (no extra inspection). */
   private tagRows(rows: ListRow[], next: ListRow | undefined) {
     const tags: RowTag[] = rows.map((r) => {
+      const at = { row: r.box, name: r.name, button: r.button };
       const st = this.known.get(r.username);
-      if (r === next) return { box: r.link.box, label: 'Suivant', tone: 'next' };
+      if (r.username === next?.username) return { ...at, label: 'Suivant', tone: 'next' };
       if (st === 'done') {
         // "Liké" only when a like was really sent and confirmed (DOM + snapshot).
         const o = this.outcomes.get(r.username);
-        if (o === 'liked') return { box: r.link.box, label: 'Liké', tone: 'done' };
-        if (o === 'simulated') return { box: r.link.box, label: 'Simulé', tone: 'skipped' };
-        return { box: r.link.box, label: o ? 'Ignoré' : 'Déjà vu', tone: 'skipped' };
+        if (o === 'liked') return { ...at, label: 'Liké', tone: 'done' };
+        if (o === 'simulated') return { ...at, label: 'Simulé', tone: 'skipped' };
+        return { ...at, label: o ? 'Ignoré' : 'Déjà vu', tone: 'skipped' };
       }
-      if (st === 'error') return { box: r.link.box, label: 'Erreur', tone: 'error' };
-      return { box: r.link.box, label: 'À traiter', tone: 'todo' };
+      if (st === 'error') return { ...at, label: 'Erreur', tone: 'error' };
+      return { ...at, label: 'À traiter', tone: 'todo' };
     });
     this.p.page.tagRows(tags);
   }
@@ -757,6 +864,9 @@ export class Engine {
       discovered: this.discovered,
       likes: { story: this.likes.story + this.pending.story, post: this.likes.post + this.pending.post },
       dryLikes: this.dryLikes,
+      sessionLikes: this.ctx.settings.dryRun
+        ? this.dryLikes
+        : this.likesBefore + this.likes.story + this.pending.story + this.likes.post + this.pending.post,
       skippedCatchUp: this.catchUp.size,
       elapsedMs: this.elapsed(),
       flash,

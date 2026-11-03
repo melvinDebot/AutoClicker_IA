@@ -4,7 +4,7 @@ import { AccessibilityInfo, Animated, Easing, Modal, Pressable, StyleSheet, View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Progress } from '@/engine/ports';
-import { formatDuration, progressPct } from '@/engine/stats';
+import { formatDuration, likesText, progressPct } from '@/engine/stats';
 import { Avatar, ProgressBar, Text } from '../components';
 import { Icon } from '../Icon';
 import { colors } from '../theme';
@@ -66,6 +66,7 @@ export function LockedOverlay({
   startedAt,
   previousElapsedMs,
   dryRun,
+  likeTarget,
   onStop,
 }: {
   visible: boolean;
@@ -74,6 +75,8 @@ export function LockedOverlay({
   startedAt: number;
   previousElapsedMs: number;
   dryRun: boolean;
+  /** Likes to send in the session: the bar follows them, not the accounts. */
+  likeTarget: number;
   onStop: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -104,8 +107,8 @@ export function LockedOverlay({
   };
 
   const p = progress;
-  const likes = p ? p.likes.story + p.likes.post : 0;
-  const pct = p ? progressPct(p.processed, p.discovered) : 0;
+  const sessionLikes = p?.sessionLikes ?? 0;
+  const pct = progressPct(sessionLikes, likeTarget);
   const elapsed = previousElapsedMs + (now - startedAt);
 
   return (
@@ -152,13 +155,13 @@ export function LockedOverlay({
               Compte {p?.index ?? 0} · {p?.discovered ?? 0} détectés
             </Text>
             <Text size={12} color={colors.textMuted} tabular>
-              {dryRun ? `${p?.dryLikes ?? 0} simulés` : `${likes} like${likes > 1 ? 's' : ''}`}
+              {sessionLikes} / {likesText(likeTarget, dryRun)}
             </Text>
             <Text size={12} color={colors.textMuted} tabular>
               {formatDuration(elapsed)}
             </Text>
           </View>
-          <ProgressBar pct={pct} label={`${p?.processed ?? 0} comptes traités sur ${p?.discovered ?? 0} détectés`} />
+          <ProgressBar pct={pct} label={`${likesText(sessionLikes, dryRun)} sur ${likeTarget}`} />
           <HoldToStop onStop={onStop} />
         </View>
       </View>

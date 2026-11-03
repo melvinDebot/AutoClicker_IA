@@ -67,6 +67,27 @@ describe('inspectScript', () => {
     expect(p.loading).toBe(false);
   });
 
+  it('gives each row the box of its username text and of its follow button (row tags)', () => {
+    const html = `<span data-r="150 18 90 24">Followers</span>${row('user00', 120)}`;
+    // jsdom has no text layout: without it, the link box is used.
+    let p = page('/atelier.lumen/followers/', html);
+    expect(p.list?.rows[0]!.name).toEqual({ x: 70, y: 132, w: 120, h: 18 });
+    expect(p.list?.rows[0]!.button).toEqual({ x: 290, y: 136, w: 80, h: 32 });
+    // On the device, the text nodes themselves (narrower than a link laid out as a block), clipped to the link.
+    const w = load('/atelier.lumen/followers/', html);
+    w.Range.prototype.getBoundingClientRect = function (this: Range) {
+      const long = (this.startContainer.nodeValue ?? '').length > 6;
+      return { left: 70, top: 133, width: long ? 400 : 52, height: 16, right: long ? 470 : 122, bottom: 149, x: 70, y: 133, toJSON: () => ({}) } as DOMRect;
+    };
+    p = run<RawPage>(inspectScript());
+    expect(p.list?.rows[0]!.name).toEqual({ x: 70, y: 133, w: 52, h: 16 });
+    // Text overflowing its link (ellipsis): only the visible part.
+    load('/atelier.lumen/followers/', `<span data-r="150 18 90 24">Followers</span>${row('a.very.long.name', 120)}`).Range.prototype.getBoundingClientRect =
+      w.Range.prototype.getBoundingClientRect;
+    p = run<RawPage>(inspectScript());
+    expect(p.list?.rows[0]!.name).toEqual({ x: 70, y: 133, w: 120, h: 16 });
+  });
+
   it('real layout (iPhone dump): rows in <main>, own profile in the fixed bottom bar never taken as a follower', () => {
     const p = page(
       '/egliseicc_paris/followers/',

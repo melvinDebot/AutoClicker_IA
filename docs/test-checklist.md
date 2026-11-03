@@ -30,15 +30,25 @@ Toujours commencer par l'**essai à blanc** (activé par défaut dans Réglages)
 
 ## 3. Exécution réelle (seulement après le n° 12 du spike validé)
 
-Réglages : plafond par session à **3**, essai à blanc **désactivé**.
+Réglages : objectif par session à **3** (ou directement dans le récap, « Likes à envoyer »), essai à blanc **désactivé**. Jamais dans les 48 h qui suivent un avertissement d'Instagram (l'app refuse alors l'exécution réelle).
 
 | # | Action | Attendu | OK |
 |---|---|---|---|
 | 16 | Lancer → Récap | Encadré rouge « Exécution réelle » | ☐ |
 | 17 | Story non likée | Cœur rempli après le toucher, HUD « Story likée » ; vérifiable dans Instagram | ☐ |
 | 18 | Post déjà liké | Jamais touché (« déjà likée ») | ☐ |
-| 19 | 3 likes atteints | Pause « Plafond de la session atteint (3 likes) » | ☐ |
+| 19 | 3 likes atteints | Pause « Objectif de la session atteint (3 likes) », sans ouvrir de profil de plus | ☐ |
 | 20 | Réglages → Likes aujourd'hui | Compteur à jour | ☐ |
+
+## Sur le simulateur, sans Instagram
+
+Une copie locale des pages d'Instagram (liste, profils publics, privés, sans post, stories, posts) permet d'essayer le moteur, l'overlay et le rythme sans toucher au compte :
+
+```bash
+node tools/fixture-server.mjs
+```
+
+Puis dans l'app (build de développement) : debug › « Liste factice », ou ouvrir `autoclicker://?fixture=1`. Les likes n'existent que dans cette page.
 
 ## Si ça s'arrête
 

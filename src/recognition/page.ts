@@ -16,6 +16,10 @@ export type DomEl = {
 export type ListRow = {
   username: string;
   link: DomEl;
+  /** Visible username text (the link box can be wider than its text). */
+  name: Box;
+  /** Button at the end of the row (Follow, Remove…), null when there is none. */
+  button: Box | null;
   /** Whole row (avatar, names, follow button). */
   box: Box;
   /** Avatar box, to check the story ring on the snapshot. */

@@ -1,6 +1,6 @@
 # AutoClicker
 
-App iPhone personnelle (Expo, dev build) : dans une WebView Instagram où vous êtes connecté, elle parcourt la liste des abonnés d'un compte et like la story et 0 à 3 posts de chaque compte, avec validation, essai à blanc par défaut, plafonds et arrêt immédiat sur tout avertissement d'Instagram.
+App iPhone personnelle (Expo, dev build) : dans une WebView Instagram où vous êtes connecté, elle parcourt la liste des abonnés d'un compte et like la story et 0 à 3 posts de chaque compte, avec validation, essai à blanc par défaut, objectif de likes par session, plafond du jour, rythme lent (pauses tirées au hasard) et arrêt immédiat sur tout avertissement d'Instagram, suivi de 48 h sans vrai like.
 
 > Les likes automatisés sont contraires aux conditions d'utilisation d'Instagram et peuvent entraîner la restriction du compte. Usage personnel uniquement, pas de publication sur l'App Store.
 
@@ -88,6 +88,16 @@ npm run typecheck
 ```bash
 npm test
 ```
+
+Sur le simulateur sans toucher à Instagram : `node tools/fixture-server.mjs`, puis debug › « Liste factice » (voir la [checklist](docs/test-checklist.md)).
+
+## Rythme et limites
+
+Instagram ne publie pas ses limites ; « Try again later » / « Réessayez plus tard » vient d'un trop grand nombre d'actions (likes, mais aussi profils ouverts) dans un court laps de temps. D'où, par défaut :
+
+- objectif de **20 likes** par session (réglable dans le récap) et plafond de **60 par jour** ;
+- rythme **Lent** : 20 à 45 s de pause tirée au hasard entre deux comptes, 2 à 5 s sur chaque post avant le j'aime (Normal 8–20 s, Très lent 45–90 s) ;
+- après un avertissement d'Instagram, **aucun vrai like pendant 48 h** (l'essai à blanc reste possible).
 
 ## Architecture
 

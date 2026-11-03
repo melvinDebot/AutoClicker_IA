@@ -1,13 +1,20 @@
 import { parseSettings } from '../settings';
-import { dayKey, formatDuration, parsePostResults, progressPct } from '../stats';
+import { dayKey, formatDuration, likesText, parsePostResults, progressPct } from '../stats';
 import { DEFAULT_SETTINGS } from '../types';
 
 describe('parseSettings', () => {
   it('uses the defaults: dry run on, low caps', () => {
     expect(parseSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(DEFAULT_SETTINGS.dryRun).toBe(true);
-    expect(DEFAULT_SETTINGS.maxLikesPerSession).toBe(30);
-    expect(DEFAULT_SETTINGS.maxLikesPerDay).toBe(100);
+    expect(DEFAULT_SETTINGS.maxLikesPerSession).toBe(20);
+    expect(DEFAULT_SETTINGS.maxLikesPerDay).toBe(60);
+    expect(DEFAULT_SETTINGS.pace).toBe('slow');
+  });
+
+  it('keeps a known pace, falls back on anything else', () => {
+    expect(parseSettings(JSON.stringify({ pace: 'very_slow' })).pace).toBe('very_slow');
+    expect(parseSettings(JSON.stringify({ pace: 'toString' })).pace).toBe('slow');
+    expect(parseSettings(JSON.stringify({ pace: 3 })).pace).toBe('slow');
   });
 
   it('falls back to the defaults on corrupted data', () => {
@@ -41,6 +48,13 @@ describe('stats', () => {
     expect(parsePostResults('["liked","already","bad"]')).toEqual(['liked', 'already']);
     expect(parsePostResults('nope')).toEqual([]);
     expect(parsePostResults(null)).toEqual([]);
+  });
+
+  it('writes like counts in French, singular and plural', () => {
+    expect(likesText(1)).toBe('1 like');
+    expect(likesText(5)).toBe('5 likes');
+    expect(likesText(1, true)).toBe('1 like simulé');
+    expect(likesText(5, true)).toBe('5 likes simulés');
   });
 
   it('formats durations', () => {

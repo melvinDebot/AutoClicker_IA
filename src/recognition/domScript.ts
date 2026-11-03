@@ -34,6 +34,25 @@ function norm(s) {
     .replace(/[\\u2019\\u2018]/g, "'").replace(/\\s+/g, ' ').trim().toLowerCase();
 }
 function rectOf(el) { var r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }
+// Box of the text itself: a link laid out as a block is as wide as its column, its text is not.
+// Measured on the text nodes (a range over the element would include its block children), clipped
+// to the element (text cut by an ellipsis).
+function textBox(el) {
+  var b = rectOf(el);
+  try {
+    var tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), t, x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    while ((t = tw.nextNode())) {
+      if (!t.nodeValue || !t.nodeValue.trim()) continue;
+      var rg = document.createRange(); rg.selectNodeContents(t);
+      var r = rg.getBoundingClientRect();
+      if (!r || r.width < 1 || r.height < 1) continue;
+      x1 = Math.min(x1, r.left); y1 = Math.min(y1, r.top); x2 = Math.max(x2, r.right); y2 = Math.max(y2, r.bottom);
+    }
+    x1 = Math.max(x1, b.x); x2 = Math.min(x2, b.x + b.w);
+    if (x2 - x1 >= 1 && y2 - y1 >= 1) return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  } catch (e) {}
+  return b;
+}
 function isVisible(el, b) {
   if (b.w < 1 || b.h < 1 || b.y + b.h <= 0 || b.x + b.w <= 0 || b.y >= vh || b.x >= vw) return false;
   var cs = window.getComputedStyle(el);
@@ -224,7 +243,13 @@ if (seg[1] === 'followers' || titleEls.length) {
       var hit = document.elementFromPoint(nb2.x + Math.min(nb2.w / 2, 30), nb2.y + nb2.h / 2);
       uncovered = !!hit && (row === hit || row.contains(hit));
     }
-    rows.push({ username: u, link: reg1(nameLink, 'user_row'), box: rb, avatar: ab, storyRing: ring,
+    // Right-most button after the name (Follow / Remove…), never touched: the row tag must not cover it.
+    var nameBox = textBox(nameLink), button = null, rbtns = row.querySelectorAll('button,[role="button"]');
+    for (var q = 0; q < rbtns.length; q++) {
+      var qb = rectOf(rbtns[q]);
+      if (qb.x > nameBox.x + nameBox.w / 2 && isVisible(rbtns[q], qb) && (!button || qb.x > button.x)) button = qb;
+    }
+    rows.push({ username: u, link: reg1(nameLink, 'user_row'), name: nameBox, button: button, box: rb, avatar: ab, storyRing: ring,
       fullyVisible: uncovered && rb.y >= titleBottom - 1 && rb.y + rb.h <= bottomLimit + 1 });
     if (!scroller) {
       for (var s = first.parentElement; s && s !== document.body; s = s.parentElement) {

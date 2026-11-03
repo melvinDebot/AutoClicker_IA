@@ -16,6 +16,7 @@ import { parseInstagramUrl, type ParsedUrl } from '@/recognition/url';
 import { Button, Text } from '@/ui/components';
 import { DomDebugPanel } from '@/ui/debug/DomDebugPanel';
 import { DomOverlay } from '@/ui/debug/DomOverlay';
+import { FIXTURE_URL } from '@/ui/debug/fixturePage';
 import { WebViewFrame, type InstagramWebView } from '@/ui/home/WebViewFrame';
 import { Icon, type IconName } from '@/ui/Icon';
 import { HighlightLayer } from '@/ui/run/HighlightLayer';
@@ -48,7 +49,7 @@ function caption(p: ParsedUrl, resumable: Resumable): { text: string; ok: boolea
 
 export default function HomeScreen() {
   const navigation = useNavigation();
-  const params = useLocalSearchParams<{ resume?: string }>();
+  const params = useLocalSearchParams<{ resume?: string; fixture?: string }>();
   const webRef = useRef<InstagramWebView>(null);
   const urlRef = useRef(START_URL);
   const [source, setSource] = useState({ uri: START_URL, key: 0 });
@@ -122,6 +123,15 @@ export default function HomeScreen() {
     });
     router.setParams({ resume: undefined });
   }, [params.resume]);
+
+  // DEVELOPMENT ONLY: local fake Instagram (debug panel, or autoclicker://?fixture=1), nothing sent to
+  // Instagram. Served by `node tools/fixture-server.mjs` on the Mac.
+  const openFixture = useCallback(() => setSource((prev) => ({ uri: FIXTURE_URL, key: prev.key + 1 })), []);
+  useEffect(() => {
+    if (!__DEV__ || !params.fixture) return;
+    openFixture();
+    router.setParams({ fixture: undefined });
+  }, [params.fixture, openFixture]);
 
   const parsed = parseInstagramUrl(nav.url);
   useEffect(() => {
@@ -232,6 +242,10 @@ export default function HomeScreen() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             onClose={() => setDebugOpen(false)}
+            onFixture={() => {
+              openFixture();
+              setDebugOpen(false);
+            }}
           />
         </View>
       ) : locked ? null : (
@@ -267,6 +281,7 @@ export default function HomeScreen() {
         startedAt={phase.name === 'locked' ? phase.startedAt : Date.now()}
         previousElapsedMs={phase.name === 'locked' ? phase.plan.previousElapsedMs : 0}
         dryRun={phase.name === 'locked' ? phase.plan.settings.dryRun : true}
+        likeTarget={phase.name === 'locked' ? phase.plan.settings.maxLikesPerSession : 0}
         onStop={() => runner.stop('manual')}
       />
       {phase.name === 'summary' ? <SummarySheet phase={phase} onClose={runner.close} onResume={runner.scan} /> : null}

@@ -57,6 +57,8 @@ export type FakeOptions = {
   brokenScroll?: boolean;
   /** Instagram puts the list back at the top every time the engine comes back to it. */
   resetScrollOnReturn?: boolean;
+  /** The first N readings of the list (at start and after each return) show it 40 px lower: still sliding in. */
+  listSlidesIn?: number;
 };
 
 type Frame =
@@ -93,7 +95,7 @@ export class FakeInstagram implements PagePort, VisionPort {
   taps: string[] = [];
   highlights: Highlight[] = [];
   private pending: string[] = [];
-  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor' | 'ocrGarbageUntilScrollFor' | 'brokenScroll' | 'resetScrollOnReturn'>> &
+  private o: Required<Omit<FakeOptions, 'stuckLoadingAtScroll' | 'warningAfterLikes' | 'disconnectAfterInspects' | 'ocrLiesFor' | 'storyAdvancesFor' | 'lateProfileSnapshots' | 'tilesBelowFold' | 'heartBelowFold' | 'postBackSkipsProfileFor' | 'splitProfileNameFor' | 'ocrGarbageUntilScrollFor' | 'brokenScroll' | 'resetScrollOnReturn' | 'listSlidesIn'>> &
     FakeOptions;
 
   constructor(
@@ -106,7 +108,10 @@ export class FakeInstagram implements PagePort, VisionPort {
     this.pending = users.map((u) => u.username);
     this.load(this.o.initialLoaded);
     this.dialog = this.o.dismissDialogOnce;
+    this.slideLeft = this.o.listSlidesIn ?? 0;
   }
+
+  private slideLeft = 0;
 
   private load(n: number) {
     const chunk = this.pending.splice(0, n);
@@ -152,11 +157,15 @@ export class FakeInstagram implements PagePort, VisionPort {
         if (this.loadingTicks === 0) this.load(this.o.loadStep);
       }
       const visible = this.order.slice(this.scrollTop, this.scrollTop + this.o.pageSize);
+      const slide = this.slideLeft > 0 ? 40 : 0;
+      if (this.slideLeft > 0) this.slideLeft -= 1;
       const rows: ListRow[] = visible.map((u, i) => {
-        const box = { x: 0, y: LIST_TOP + i * ROW_H, w: VW, h: ROW_H };
+        const box = { x: 0, y: LIST_TOP + slide + i * ROW_H, w: VW, h: ROW_H };
         return {
           username: u,
           link: el(`row:${u}`, 'user_row', { x: 70, y: box.y + 12, w: 200, h: 20 }, { href: `/${u}/`, text: u }),
+          name: { x: 70, y: box.y + 13, w: u.length * 8, h: 18 },
+          button: { x: 290, y: box.y + 16, w: 80, h: 32 },
           box,
           avatar: { x: 12, y: box.y + 8, w: 48, h: 48 },
           storyRing: !!this.user(u).story,
@@ -275,6 +284,7 @@ export class FakeInstagram implements PagePort, VisionPort {
     if (this.frame.kind === 'followers') {
       this.pageScrolls = 0;
       if (this.o.resetScrollOnReturn) this.scrollTop = 0;
+      this.slideLeft = this.o.listSlidesIn ?? 0;
     }
     if (this.frame.kind === 'followers' && this.o.reorderOnReturn) {
       // Instagram reorders the visible window when coming back.
@@ -384,7 +394,7 @@ export class FakeInstagram implements PagePort, VisionPort {
 
   /** Same view as inspect(), without side effects on counters or loading. */
   private async peek(): Promise<PageState> {
-    const saved = { inspects: this.inspects, ticks: this.loadingTicks, order: [...this.order], pending: [...this.pending] };
+    const saved = { inspects: this.inspects, ticks: this.loadingTicks, order: [...this.order], pending: [...this.pending], slide: this.slideLeft };
     const disconnect = this.o.disconnectAfterInspects;
     this.o.disconnectAfterInspects = undefined;
     try {
@@ -395,6 +405,7 @@ export class FakeInstagram implements PagePort, VisionPort {
       this.loadingTicks = saved.ticks;
       this.order = saved.order;
       this.pending = saved.pending;
+      this.slideLeft = saved.slide;
     }
   }
 }
@@ -405,7 +416,7 @@ export class MemoryStore implements StorePort {
   sessions = new Map<string, Record<string, unknown>>();
   likes = new Map<string, number>();
   today = 0;
-  events: { type: string; payload: unknown }[] = [];
+  events: { type: string; payload: unknown; at: number }[] = [];
 
   private of(sid: string) {
     let m = this.users.get(sid);
@@ -444,8 +455,12 @@ export class MemoryStore implements StorePort {
   async likeCounts(sid: string) {
     return { session: this.likes.get(sid) ?? 0, today: this.today };
   }
-  async event(_sid: string, type: string, payload: unknown) {
-    this.events.push({ type, payload });
+  async lastWarningAt() {
+    const w = this.events.filter((e) => e.type === 'instagram_warning');
+    return w.length ? Math.max(...w.map((e) => e.at)) : null;
+  }
+  async event(_sid: string, type: string, payload: unknown, now: number) {
+    this.events.push({ type, payload, at: now });
   }
   results(sid: string) {
     return Object.fromEntries([...this.of(sid)].map(([u, v]) => [u, v]));

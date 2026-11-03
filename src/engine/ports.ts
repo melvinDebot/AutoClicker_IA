@@ -5,8 +5,11 @@ import type { Box, PostResult, Privacy, Settings, StoryResult, TextBlock } from 
 
 export type Highlight = { box: Box; label: string; tone: 'target' | 'dry' | 'done' } | null;
 
-/** State tag drawn next to a visible row of the list during a run (data already known, no extra work). */
-export type RowTag = { box: Box; label: string; tone: 'todo' | 'done' | 'next' | 'error' | 'skipped' };
+/**
+ * State tag drawn next to a visible row of the list during a run (data already known, no extra work).
+ * It sits after the visible username (`name`), inside the `row`, left of its `button`.
+ */
+export type RowTag = { row: Box; name: Box; button: Box | null; label: string; tone: 'todo' | 'done' | 'next' | 'error' | 'skipped' };
 
 export interface PagePort {
   inspect(): Promise<PageState>;
@@ -76,6 +79,8 @@ export interface StorePort {
   ): Promise<void>;
   /** Likes already made in this session (previous runs included) and today. */
   likeCounts(sessionId: string, now: number): Promise<{ session: number; today: number }>;
+  /** Time of the last Instagram warning met by any session, null if none. */
+  lastWarningAt(): Promise<number | null>;
   event(sessionId: string, type: string, payload: unknown, now: number): Promise<void>;
 }
 
@@ -84,7 +89,8 @@ export interface Clock {
   sleep(ms: number, signal?: AbortSignal): Promise<void>;
 }
 
-export type Ports = { page: PagePort; vision: VisionPort; store: StorePort; clock: Clock };
+/** `random` (0 ≤ x < 1) draws the pauses; tests pass a fixed one. Math.random by default. */
+export type Ports = { page: PagePort; vision: VisionPort; store: StorePort; clock: Clock; random?: () => number };
 
 export type RunContext = {
   sessionId: string;
@@ -109,7 +115,8 @@ export type Step =
   | 'back_to_list'
   | 'save'
   | 'scroll'
-  | 'catch_up';
+  | 'catch_up'
+  | 'pause';
 
 export type Progress = {
   step: Step;
@@ -122,6 +129,8 @@ export type Progress = {
   likes: { story: number; post: number };
   /** Likes the dry run would have made. */
   dryLikes: number;
+  /** Likes of the whole session (earlier runs included, simulated ones in dry run), against its target. */
+  sessionLikes: number;
   skippedCatchUp: number;
   elapsedMs: number;
   flash?: string;

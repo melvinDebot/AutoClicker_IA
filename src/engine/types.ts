@@ -51,6 +51,8 @@ export type PostResult = 'liked' | 'already' | 'skipped' | 'error';
 
 export type AutoStop = 0 | 15 | 30 | 60; // minutes, 0 = never
 export type PostsPerUser = 0 | 1 | 2 | 3;
+/** Pause drawn at random between two accounts (see PACES in settings.ts). */
+export type Pace = 'normal' | 'slow' | 'very_slow';
 
 export type Settings = {
   likeStory: boolean;
@@ -59,6 +61,8 @@ export type Settings = {
   postsPerUser: PostsPerUser;
   autoStopMin: AutoStop;
   dryRun: boolean;
+  pace: Pace;
+  /** Likes to send in the session: it stops as soon as they are sent (simulated ones count in dry run). */
   maxLikesPerSession: number;
   maxLikesPerDay: number;
 };
@@ -69,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
   postsPerUser: 2,
   autoStopMin: 30,
   dryRun: true,
-  maxLikesPerSession: 30,
-  maxLikesPerDay: 100,
+  pace: 'slow',
+  maxLikesPerSession: 20,
+  maxLikesPerDay: 60,
 };
