@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/icon.png" width="120" alt="Logo AutoClicker" />
+  <img src="assets/splash-icon.png" width="140" alt="Logo AutoClicker" />
 
   <h1>AutoClicker</h1>
 

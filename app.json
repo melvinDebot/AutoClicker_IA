@@ -47,9 +47,19 @@
     "updates": {
       "url": "https://u.expo.dev/49fcff88-4f81-4951-9fbd-f1733c220063"
     },
-    "android": {},
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#2383D2"
+      }
+    },
     "runtimeVersion": {
       "policy": "sdkVersion"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }
