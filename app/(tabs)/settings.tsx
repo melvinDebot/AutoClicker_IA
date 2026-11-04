@@ -7,7 +7,7 @@ import { resetSettings, updateSettings, useSettings } from '@/adapters/settings'
 import { seedDemoSessions } from '@/adapters/store/demoData';
 import { likesToday, wipeAllData } from '@/adapters/store/repo';
 import { lastInstagramWarning } from '@/adapters/store/sessionStore';
-import { CAP_LIMITS, cooldownUntil, PACES, paceRange } from '@/engine/settings';
+import { CAP_LIMITS, PACES, paceRange, settingsStatus, type SettingsStatus } from '@/engine/settings';
 import { formatDateTime } from '@/engine/stats';
 import type { AutoStop, Pace, PostsPerUser } from '@/engine/types';
 import { RULES_VERSION, TEMPLATES_VERSION } from '@/recognition/rules';
@@ -25,6 +25,7 @@ import {
   Text,
   useToast,
 } from '@/ui/components';
+import { Icon, type IconName } from '@/ui/Icon';
 import { colors } from '@/ui/theme';
 import { VisionCheckNative } from '../../modules/vision-check';
 
@@ -38,6 +39,35 @@ const PACE_OPTIONS: { value: Pace; label: string; sub: string }[] = (Object.keys
   label: PACES[p].label,
   sub: paceRange(p),
 }));
+
+const STATUS_LOOK: Record<SettingsStatus['level'], { icon: IconName; color: string; bg: string; border: string }> = {
+  prudent: { icon: 'checkCircle', color: colors.successText, bg: 'rgba(52,211,153,0.10)', border: 'rgba(52,211,153,0.30)' },
+  risky: { icon: 'alert', color: colors.warning, bg: 'rgba(245,184,61,0.10)', border: 'rgba(245,184,61,0.35)' },
+  blocked: { icon: 'alert', color: colors.dangerText, bg: 'rgba(255,90,110,0.10)', border: 'rgba(255,90,110,0.25)' },
+};
+
+/** Verdict on the settings, at the top: likes per day and pace, prudent or risky. */
+function StatusCard({ status, dryRun }: { status: SettingsStatus; dryRun: boolean }) {
+  const look = STATUS_LOOK[status.level];
+  return (
+    <View style={[styles.status, { backgroundColor: look.bg, borderColor: look.border }]} accessible accessibilityRole="text">
+      <View style={styles.statusHead}>
+        <Icon name={look.icon} size={18} color={look.color} />
+        <Text weight="bold" size={15} color={look.color}>
+          {status.title}
+        </Text>
+      </View>
+      <Text size={13} color={colors.textSoft} style={styles.lh}>
+        {status.text}
+      </Text>
+      {dryRun ? (
+        <Text size={12.5} color={colors.textMuted} style={styles.lh}>
+          Essai à blanc activé : aucun j’aime n’est envoyé pour l’instant.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 const STOPS: { value: AutoStop; label: string }[] = [
   { value: 0, label: 'Jamais' },
@@ -58,7 +88,7 @@ export default function SettingsScreen() {
       lastInstagramWarning().then(setWarnedAt).catch(() => {});
     }, []),
   );
-  const blockedUntil = cooldownUntil(warnedAt, Date.now());
+  const status = settingsStatus(s, warnedAt, Date.now());
 
   const confirmWipe = () =>
     Alert.alert(
@@ -91,6 +121,8 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <PageTitle title="Réglages" />
+
+        <StatusCard status={status} dryRun={s.dryRun} />
 
         <View style={styles.warning} accessible accessibilityRole="text">
           <Text weight="bold" size={14} color={colors.dangerText}>
@@ -143,17 +175,20 @@ export default function SettingsScreen() {
         <SectionHeader title="Session" />
         <SettingBlock>
           <SettingHeader
-            icon="timer"
-            tone="yellow"
-            title="Arrêt automatique"
-            description="La session s’arrête et sauvegarde à l’échéance. Avec « Jamais », elle continue tant que le défilement fait apparaître de nouveaux comptes."
+            icon="shield"
+            tone="gray"
+            title="Likes par jour"
+            description="Quota du jour, toutes sessions confondues (stories et posts) : une session continue jusqu’à l’atteindre, quel que soit le nombre de comptes, puis s’arrête. Le compteur repart de zéro chaque jour."
           />
-          <RadioGroup
-            label="Arrêt automatique"
-            value={s.autoStopMin}
-            options={STOPS}
-            onChange={(v) => updateSettings({ autoStopMin: v })}
+          <Stepper
+            label="Likes par jour"
+            unit="likes"
+            value={s.maxLikesPerDay}
+            {...CAP_LIMITS.perDay}
+            onChange={(v) => updateSettings({ maxLikesPerDay: v })}
           />
+          <InfoRow label="Likes aujourd’hui" value={`${today} / ${s.maxLikesPerDay}`} />
+          <InfoRow label="Dernier avertissement d’Instagram" value={warnedAt ? formatDateTime(warnedAt) : 'Aucun'} />
         </SettingBlock>
         <SettingBlock>
           <SettingHeader
@@ -163,6 +198,20 @@ export default function SettingsScreen() {
             description="Pause tirée au hasard entre deux comptes, plus une courte pause sur chaque post ou story avant le j’aime. Plus c’est lent, moins Instagram voit d’actions par heure."
           />
           <RadioGroup label="Rythme" value={s.pace} options={PACE_OPTIONS} onChange={(v) => updateSettings({ pace: v })} />
+        </SettingBlock>
+        <SettingBlock>
+          <SettingHeader
+            icon="timer"
+            tone="yellow"
+            title="Arrêt automatique"
+            description="La session s’arrête et sauvegarde à l’échéance, même avant le quota du jour. Avec « Jamais », elle continue jusqu’au quota ou à la fin de la liste."
+          />
+          <RadioGroup
+            label="Arrêt automatique"
+            value={s.autoStopMin}
+            options={STOPS}
+            onChange={(v) => updateSettings({ autoStopMin: v })}
+          />
         </SettingBlock>
         <SettingBlock>
           <SettingHeader
@@ -183,35 +232,6 @@ export default function SettingsScreen() {
             value={s.dryRun}
             onChange={(v) => updateSettings({ dryRun: v })}
           />
-        </SettingBlock>
-        <SettingBlock>
-          <SettingHeader
-            icon="shield"
-            tone="gray"
-            title="Objectif et plafond de likes"
-            description="La session s’arrête dès que son objectif est atteint, quel que soit le nombre de comptes (stories et posts confondus). Le plafond du jour compte toutes les sessions."
-          />
-          <Stepper
-            label="Objectif par session"
-            unit="likes"
-            value={s.maxLikesPerSession}
-            {...CAP_LIMITS.perSession}
-            onChange={(v) => updateSettings({ maxLikesPerSession: v })}
-          />
-          <Stepper
-            label="Par jour"
-            unit="likes"
-            value={s.maxLikesPerDay}
-            {...CAP_LIMITS.perDay}
-            onChange={(v) => updateSettings({ maxLikesPerDay: v })}
-          />
-          <InfoRow label="Likes aujourd’hui" value={`${today} / ${s.maxLikesPerDay}`} />
-          <InfoRow label="Dernier avertissement d’Instagram" value={warnedAt ? formatDateTime(warnedAt) : 'Aucun'} />
-          {blockedUntil ? (
-            <Text size={13} color={colors.dangerText} style={styles.lh}>
-              Aucun vrai like avant le {formatDateTime(blockedUntil)} (48 h après l’avertissement). L’essai à blanc reste possible.
-            </Text>
-          ) : null}
         </SettingBlock>
 
         <SectionHeader title="Repérage" />
@@ -264,6 +284,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
   lh: { lineHeight: 19 },
+  status: { marginTop: 16, padding: 14, gap: 6, borderRadius: 16, borderWidth: 1 },
+  statusHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   warning: {
     marginTop: 16,
     padding: 14,

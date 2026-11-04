@@ -1,8 +1,8 @@
+import { formatDateTime } from './stats';
 import { DEFAULT_SETTINGS, type AutoStop, type Pace, type PostsPerUser, type Settings } from './types';
 
 export const CAP_LIMITS = {
-  perSession: { min: 1, max: 200, step: 5 },
-  perDay: { min: 1, max: 500, step: 10 },
+  perDay: { min: 5, max: 200, step: 5 },
 } as const;
 
 /**
@@ -21,6 +21,49 @@ export const STORY_PAUSE: readonly [number, number] = [800, 2_000];
 
 /** After an Instagram warning, no real like for this long (dry runs stay possible). */
 export const WARNING_COOLDOWN_MS = 48 * 3600_000;
+
+/**
+ * Prudent routine to like every day (status card of Réglages, recap). Instagram publishes no limit:
+ * these are safety margins after the "Try again later" of 2026-11-03, not a guarantee.
+ */
+export const ADVICE = { maxPerDay: 60 } as const;
+
+export const ADVICE_TEXT = `Recommandé : ${ADVICE.maxPerDay} likes par jour au plus, en rythme Lent ou Très lent.`;
+
+/** Settings beyond the advice, in a few words; empty when everything is within it. */
+export function beyondAdvice(s: Settings): string[] {
+  const out: string[] = [];
+  if (s.maxLikesPerDay > ADVICE.maxPerDay) out.push(`${s.maxLikesPerDay} likes par jour`);
+  if (s.pace === 'normal') out.push('rythme Normal');
+  return out;
+}
+
+export type SettingsStatus = { level: 'blocked' | 'risky' | 'prudent'; title: string; text: string };
+
+/** Verdict on top of Réglages: can these settings be used every day without an Instagram warning? */
+export function settingsStatus(s: Settings, lastWarningAt: number | null, now: number): SettingsStatus {
+  const until = cooldownUntil(lastWarningAt, now);
+  if (until !== null) {
+    return {
+      level: 'blocked',
+      title: 'Pause après un avertissement',
+      text: `Instagram a limité le compte : aucun vrai like avant le ${formatDateTime(until)}. Ensuite, reprenez quelques jours avec la moitié de votre quota.`,
+    };
+  }
+  const beyond = beyondAdvice(s).join(', ');
+  if (beyond) {
+    return {
+      level: 'risky',
+      title: 'Réglages risqués',
+      text: `${beyond[0]!.toUpperCase()}${beyond.slice(1)} : risque de « Réessayez plus tard ». ${ADVICE_TEXT}`,
+    };
+  }
+  return {
+    level: 'prudent',
+    title: 'Réglages prudents',
+    text: `${s.maxLikesPerDay} likes par jour en rythme ${PACES[s.pace].label} : dans les repères pour liker chaque jour sans avertissement (${ADVICE.maxPerDay} au plus, rythme Lent ou Très lent).`,
+  };
+}
 
 /** End of the no-real-like period after the last Instagram warning, null when it is over (or none). */
 export function cooldownUntil(lastWarningAt: number | null, now: number): number | null {
@@ -59,12 +102,6 @@ export function parseSettings(raw: string | null | undefined): Settings {
     // Dry run stays on unless explicitly turned off by the user.
     dryRun: v.dryRun === false ? false : true,
     pace: (Object.keys(PACES) as Pace[]).includes(v.pace as Pace) ? (v.pace as Pace) : d.pace,
-    maxLikesPerSession: clamp(
-      v.maxLikesPerSession,
-      CAP_LIMITS.perSession.min,
-      CAP_LIMITS.perSession.max,
-      d.maxLikesPerSession,
-    ),
     maxLikesPerDay: clamp(v.maxLikesPerDay, CAP_LIMITS.perDay.min, CAP_LIMITS.perDay.max, d.maxLikesPerDay),
   };
 }

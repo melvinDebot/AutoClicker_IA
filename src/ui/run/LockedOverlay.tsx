@@ -75,7 +75,7 @@ export function LockedOverlay({
   startedAt: number;
   previousElapsedMs: number;
   dryRun: boolean;
-  /** Likes to send in the session: the bar follows them, not the accounts. */
+  /** Daily quota: the bar follows today's likes, not the accounts. */
   likeTarget: number;
   onStop: () => void;
 }) {
@@ -107,8 +107,8 @@ export function LockedOverlay({
   };
 
   const p = progress;
-  const sessionLikes = p?.sessionLikes ?? 0;
-  const pct = progressPct(sessionLikes, likeTarget);
+  const dayLikes = p?.dayLikes ?? 0;
+  const pct = progressPct(dayLikes, likeTarget);
   const elapsed = previousElapsedMs + (now - startedAt);
 
   return (
@@ -155,13 +155,13 @@ export function LockedOverlay({
               Compte {p?.index ?? 0} · {p?.discovered ?? 0} détectés
             </Text>
             <Text size={12} color={colors.textMuted} tabular>
-              {sessionLikes} / {likesText(likeTarget, dryRun)}
+              {dayLikes} / {likesText(likeTarget, dryRun)}{dryRun ? '' : ' auj.'}
             </Text>
             <Text size={12} color={colors.textMuted} tabular>
               {formatDuration(elapsed)}
             </Text>
           </View>
-          <ProgressBar pct={pct} label={`${likesText(sessionLikes, dryRun)} sur ${likeTarget}`} />
+          <ProgressBar pct={pct} label={`${likesText(dayLikes, dryRun)} sur ${likeTarget}${dryRun ? '' : ' aujourd’hui'}`} />
           <HoldToStop onStop={onStop} />
         </View>
       </View>

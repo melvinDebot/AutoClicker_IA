@@ -281,7 +281,7 @@ export default function HomeScreen() {
         startedAt={phase.name === 'locked' ? phase.startedAt : Date.now()}
         previousElapsedMs={phase.name === 'locked' ? phase.plan.previousElapsedMs : 0}
         dryRun={phase.name === 'locked' ? phase.plan.settings.dryRun : true}
-        likeTarget={phase.name === 'locked' ? phase.plan.settings.maxLikesPerSession : 0}
+        likeTarget={phase.name === 'locked' ? phase.plan.settings.maxLikesPerDay : 0}
         onStop={() => runner.stop('manual')}
       />
       {phase.name === 'summary' ? <SummarySheet phase={phase} onClose={runner.close} onResume={runner.scan} /> : null}

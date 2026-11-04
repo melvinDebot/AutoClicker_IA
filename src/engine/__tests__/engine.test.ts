@@ -26,7 +26,7 @@ async function run(
   const ctx: RunContext = {
     sessionId: SID,
     targetAccount: 'atelier.lumen',
-    settings: { ...DEFAULT_SETTINGS, dryRun: false, autoStopMin: 0, maxLikesPerSession: 500, maxLikesPerDay: 500, ...settings },
+    settings: { ...DEFAULT_SETTINGS, dryRun: false, autoStopMin: 0, maxLikesPerDay: 500, ...settings },
     previousElapsedMs: 0,
     signal: ctrl.signal,
     onProgress: (p) => progress.push(p),
@@ -255,40 +255,47 @@ describe('Engine — stops', () => {
     expect(results.user00!.state).toBe('todo'); // nothing sent: will be retried on resume
   });
 
-  it('stops at the session target with exactly that many likes', async () => {
-    const { outcome, ig } = await run(users(10), {}, { maxLikesPerSession: 4, postsPerUser: 2 });
+  it('stops at the daily quota with exactly that many likes', async () => {
+    const { outcome, ig } = await run(users(10), {}, { maxLikesPerDay: 4, postsPerUser: 2 });
     expect(outcome.status).toBe('paused');
-    expect(outcome.reason).toBe('Objectif de la session atteint (4 likes).');
+    expect(outcome.reason).toBe('Quota du jour atteint (4 likes). Reprise possible demain.');
     expect(ig.likesSent).toBe(4);
   });
 
-  it('target reached at the end of an account: stops without opening another profile', async () => {
-    const { outcome, ig, progress } = await run(users(10), {}, { maxLikesPerSession: 4, postsPerUser: 2, likeStory: false });
-    expect(outcome.reason).toBe('Objectif de la session atteint (4 likes).');
+  it('quota reached at the end of an account: stops without opening another profile', async () => {
+    const { outcome, ig, progress } = await run(users(10), {}, { maxLikesPerDay: 4, postsPerUser: 2, likeStory: false });
+    expect(outcome.reason).toBe('Quota du jour atteint (4 likes). Reprise possible demain.');
     expect(ig.likesSent).toBe(4);
     expect(opened(ig, 'user02')).toBe(0);
-    expect(progress[progress.length - 1]!.sessionLikes).toBe(4);
+    expect(progress[progress.length - 1]!.dayLikes).toBe(4);
   });
 
-  it('counts the likes of earlier runs of the session against its target', async () => {
-    const { outcome, ig, progress } = await run(users(10), {}, { maxLikesPerSession: 5, postsPerUser: 2, likeStory: false }, ({ store }) =>
-      store.likes.set(SID, 3),
-    );
-    expect(outcome.reason).toBe('Objectif de la session atteint (5 likes).');
+  it('goes on until the quota whatever the session: likes of other sessions today count, not the session', async () => {
+    const { outcome, ig, progress } = await run(users(10), {}, { maxLikesPerDay: 5, postsPerUser: 2, likeStory: false }, ({ store }) => {
+      store.today = 3; // sent earlier today by another session
+      store.likes.set(SID, 40); // a resumed session that already sent a lot on other days: no effect
+    });
+    expect(outcome.reason).toBe('Quota du jour atteint (5 likes). Reprise possible demain.');
     expect(ig.likesSent).toBe(2);
-    expect(progress[progress.length - 1]!.sessionLikes).toBe(5);
+    expect(progress[progress.length - 1]!.dayLikes).toBe(5);
   });
 
-  it('dry run: stops at the target with simulated likes, none sent', async () => {
-    const { outcome, ig } = await run(users(10), {}, { dryRun: true, maxLikesPerSession: 3, postsPerUser: 1, likeStory: false });
-    expect(outcome.reason).toBe('Objectif de la session atteint (3 likes simulés).');
+  it('quota already reached today: stops before opening anything', async () => {
+    const { outcome, ig } = await run(users(10), {}, { maxLikesPerDay: 5 }, ({ store }) => (store.today = 5));
+    expect(outcome.reason).toBe('Quota du jour atteint (5 likes). Reprise possible demain.');
+    expect(ig.taps).toEqual([]);
+  });
+
+  it('dry run: stops at the quota with simulated likes, none sent', async () => {
+    const { outcome, ig } = await run(users(10), {}, { dryRun: true, maxLikesPerDay: 3, postsPerUser: 1, likeStory: false });
+    expect(outcome.reason).toBe('Quota du jour atteint (3 likes simulés).');
     expect(ig.likesSent).toBe(0);
     expect(opened(ig, 'user03')).toBe(0);
   });
 
-  it('stops at the daily cap, counting likes of other sessions', async () => {
+  it('stops at the daily quota, counting likes of other sessions', async () => {
     const { outcome, ig } = await run(users(10), {}, { maxLikesPerDay: 5, postsPerUser: 2 }, ({ store }) => (store.today = 3));
-    expect(outcome.reason).toMatch(/Plafond du jour atteint/);
+    expect(outcome.reason).toMatch(/Quota du jour atteint/);
     expect(ig.likesSent).toBe(2);
   });
 
@@ -353,7 +360,7 @@ describe('Engine — stops', () => {
   });
 
   it('auto stop after the chosen duration', async () => {
-    const { outcome } = await run(users(600), { initialLoaded: 600 }, { autoStopMin: 15, postsPerUser: 3, maxLikesPerSession: 100_000, maxLikesPerDay: 100_000 });
+    const { outcome } = await run(users(600), { initialLoaded: 600 }, { autoStopMin: 15, postsPerUser: 3, maxLikesPerDay: 100_000 });
     expect(outcome).toEqual({ status: 'paused', reason: 'Arrêt automatique (15 min)' });
   });
 });
@@ -424,15 +431,15 @@ describe('Engine — one engine, several runs (as in the app)', () => {
     const ctx = (sessionId: string, progress: Progress[]): RunContext => ({
       sessionId,
       targetAccount: 'atelier.lumen',
-      settings: { ...DEFAULT_SETTINGS, dryRun: true, autoStopMin: 0, postsPerUser: 1, likeStory: false, maxLikesPerSession: 2 },
+      settings: { ...DEFAULT_SETTINGS, dryRun: true, autoStopMin: 0, postsPerUser: 1, likeStory: false, maxLikesPerDay: 2 },
       previousElapsedMs: 0,
       signal: new AbortController().signal,
       onProgress: (p) => progress.push(p),
     });
     const first: Progress[] = [];
-    expect((await engine.run(ctx('a', first))).reason).toBe('Objectif de la session atteint (2 likes simulés).');
+    expect((await engine.run(ctx('a', first))).reason).toBe('Quota du jour atteint (2 likes simulés).');
     const second: Progress[] = [];
-    expect((await engine.run(ctx('b', second))).reason).toBe('Objectif de la session atteint (2 likes simulés).');
+    expect((await engine.run(ctx('b', second))).reason).toBe('Quota du jour atteint (2 likes simulés).');
     expect(second.filter((p) => p.step === 'pause')).toHaveLength(1); // none before its first account
     expect(second[second.length - 1]!.dryLikes).toBe(2);
   });

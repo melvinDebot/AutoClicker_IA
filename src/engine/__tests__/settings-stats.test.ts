@@ -1,4 +1,4 @@
-import { parseSettings } from '../settings';
+import { ADVICE, beyondAdvice, parseSettings, settingsStatus } from '../settings';
 import { dayKey, formatDuration, likesText, parsePostResults, progressPct } from '../stats';
 import { DEFAULT_SETTINGS } from '../types';
 
@@ -6,9 +6,36 @@ describe('parseSettings', () => {
   it('uses the defaults: dry run on, low caps', () => {
     expect(parseSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(DEFAULT_SETTINGS.dryRun).toBe(true);
-    expect(DEFAULT_SETTINGS.maxLikesPerSession).toBe(20);
-    expect(DEFAULT_SETTINGS.maxLikesPerDay).toBe(60);
+    expect(DEFAULT_SETTINGS.maxLikesPerDay).toBe(40);
     expect(DEFAULT_SETTINGS.pace).toBe('slow');
+  });
+
+  it('the defaults follow the advice; anything beyond it is listed', () => {
+    expect(beyondAdvice(DEFAULT_SETTINGS)).toEqual([]);
+    expect(DEFAULT_SETTINGS.maxLikesPerDay).toBeLessThanOrEqual(ADVICE.maxPerDay);
+    expect(beyondAdvice({ ...DEFAULT_SETTINGS, maxLikesPerDay: 100, pace: 'normal' })).toEqual(['100 likes par jour', 'rythme Normal']);
+    expect(beyondAdvice({ ...DEFAULT_SETTINGS, pace: 'very_slow', maxLikesPerDay: 60 })).toEqual([]);
+  });
+
+  it('gives a verdict on the settings: prudent, risky, or paused after a warning', () => {
+    const now = new Date(2026, 10, 3, 20, 0).getTime();
+    expect(settingsStatus(DEFAULT_SETTINGS, null, now)).toEqual({
+      level: 'prudent',
+      title: 'Réglages prudents',
+      text: '40 likes par jour en rythme Lent : dans les repères pour liker chaque jour sans avertissement (60 au plus, rythme Lent ou Très lent).',
+    });
+    expect(settingsStatus({ ...DEFAULT_SETTINGS, maxLikesPerDay: 100, pace: 'normal' }, null, now)).toEqual({
+      level: 'risky',
+      title: 'Réglages risqués',
+      text: '100 likes par jour, rythme Normal : risque de « Réessayez plus tard ». Recommandé : 60 likes par jour au plus, en rythme Lent ou Très lent.',
+    });
+    expect(settingsStatus({ ...DEFAULT_SETTINGS, pace: 'normal' }, null, now).text).toMatch(/^Rythme Normal : risque/);
+    const warned = settingsStatus(DEFAULT_SETTINGS, now - 3_600_000, now);
+    expect(warned.level).toBe('blocked');
+    expect(warned.text).toBe(
+      'Instagram a limité le compte : aucun vrai like avant le 05/11 · 19:00. Ensuite, reprenez quelques jours avec la moitié de votre quota.',
+    );
+    expect(settingsStatus(DEFAULT_SETTINGS, now - 49 * 3_600_000, now).level).toBe('prudent');
   });
 
   it('keeps a known pace, falls back on anything else', () => {
@@ -28,12 +55,12 @@ describe('parseSettings', () => {
 
   it('rejects out-of-range values', () => {
     const s = parseSettings(
-      JSON.stringify({ postsPerUser: 7, autoStopMin: 45, maxLikesPerSession: 10_000, maxLikesPerDay: -3 }),
+      JSON.stringify({ postsPerUser: 7, autoStopMin: 45, maxLikesPerDay: -3 }),
     );
     expect(s.postsPerUser).toBe(DEFAULT_SETTINGS.postsPerUser);
     expect(s.autoStopMin).toBe(DEFAULT_SETTINGS.autoStopMin);
-    expect(s.maxLikesPerSession).toBe(200);
-    expect(s.maxLikesPerDay).toBe(1);
+    expect(s.maxLikesPerDay).toBe(5);
+    expect(parseSettings(JSON.stringify({ maxLikesPerDay: 10_000 })).maxLikesPerDay).toBe(200);
   });
 });
 

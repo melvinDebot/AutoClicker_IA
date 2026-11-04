@@ -8,7 +8,7 @@ Toujours commencer par l'**essai à blanc** (activé par défaut dans Réglages)
 | # | Action | Attendu | OK |
 |---|---|---|---|
 | 1 | Accueil sur une page qui n'est pas une liste d'abonnés → Lancer | Échec du scan : « Ouvrez la liste des abonnés d'un compte dans la WebView. » | ☐ |
-| 2 | Ouvrir la liste d'abonnés d'un compte → Lancer | 3 contrôles verts, puis la feuille Récapitulatif (compte, story, posts, plafonds, essai à blanc « Activé ») | ☐ |
+| 2 | Ouvrir la liste d'abonnés d'un compte → Lancer | 3 contrôles verts, puis la feuille Récapitulatif (compte, story, posts, likes par jour, rythme, essai à blanc « Activé ») | ☐ |
 | 3 | Valider | Compte à rebours de 3 s avec « Annuler » | ☐ |
 | 4 | Laisser démarrer | Écran verrouillé, barre d'onglets masquée, HUD (compte, étape, « Compte X · Y détectés », chrono) | ☐ |
 | 5 | Toucher la page pendant l'exécution | Rien ne se passe sur Instagram, l'indice « Écran verrouillé… » s'affiche | ☐ |
@@ -30,14 +30,14 @@ Toujours commencer par l'**essai à blanc** (activé par défaut dans Réglages)
 
 ## 3. Exécution réelle (seulement après le n° 12 du spike validé)
 
-Réglages : objectif par session à **3** (ou directement dans le récap, « Likes à envoyer »), essai à blanc **désactivé**. Jamais dans les 48 h qui suivent un avertissement d'Instagram (l'app refuse alors l'exécution réelle).
+Réglages : likes par jour à **5** (ou directement dans le récap) et au plus 2 déjà envoyés aujourd'hui, essai à blanc **désactivé**. Jamais dans les 48 h qui suivent un avertissement d'Instagram (l'app refuse alors l'exécution réelle).
 
 | # | Action | Attendu | OK |
 |---|---|---|---|
 | 16 | Lancer → Récap | Encadré rouge « Exécution réelle » | ☐ |
 | 17 | Story non likée | Cœur rempli après le toucher, HUD « Story likée » ; vérifiable dans Instagram | ☐ |
 | 18 | Post déjà liké | Jamais touché (« déjà likée ») | ☐ |
-| 19 | 3 likes atteints | Pause « Objectif de la session atteint (3 likes) », sans ouvrir de profil de plus | ☐ |
+| 19 | Quota atteint | Pause « Quota du jour atteint (5 likes). Reprise possible demain. », sans ouvrir de profil de plus ; un nouveau lancement le même jour est refusé dans le récap | ☐ |
 | 20 | Réglages → Likes aujourd'hui | Compteur à jour | ☐ |
 
 ## Sur le simulateur, sans Instagram

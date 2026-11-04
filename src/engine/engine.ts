@@ -72,8 +72,8 @@ export class Engine {
   private catchUp = new Set<string>();
   private current: string | null = null;
   private processedThisRun = 0;
-  /** Likes of this session sent by earlier runs (resume), for the target shown in the HUD. */
-  private likesBefore = 0;
+  /** Likes sent today before this run (all sessions), for the daily quota shown in the HUD. */
+  private todayBefore = 0;
   /** An account was just handled: pause on the list before the next one. */
   private restDue = false;
 
@@ -144,7 +144,7 @@ export class Engine {
             `Instagram a limité le compte le ${formatDateTime(w)} : aucun vrai like avant le ${formatDateTime(until)}. L’essai à blanc reste possible.`,
           );
         }
-        this.likesBefore = (await store.likeCounts(sid, clock.now())).session;
+        this.todayBefore = (await store.likeCounts(sid, clock.now())).today;
       }
       this.known = await store.loadUsers(sid);
       for (const [u, st] of this.known) if (st === 'processing') this.known.set(u, 'todo');
@@ -189,7 +189,7 @@ export class Engine {
     const listEmpty = (st: PageState) => (st.kind === 'followers' && st.list && st.list.rows.length === 0 ? LIST_EMPTY : null);
     for (;;) {
       this.checkpoint();
-      // Target reached: stop here, without opening one more profile.
+      // Daily quota reached: stop here, without opening one more profile.
       await this.checkCaps();
       let s = await this.waitFor(listReady, 'liste d’abonnés', listEmpty);
       // Instagram puts the list back at the top after each profile: go back to where we were.
@@ -731,20 +731,16 @@ export class Engine {
     }
   }
 
-  /** Session target (simulated likes count in dry run) and daily cap (real likes only). */
+  /** Daily quota, all sessions together (in dry run: the simulated likes of this run). */
   private async checkCaps(): Promise<void> {
-    const target = this.ctx.settings.maxLikesPerSession;
+    const quota = this.ctx.settings.maxLikesPerDay;
     if (this.ctx.settings.dryRun) {
-      if (this.dryLikes >= target) throw new Stop('paused', `Objectif de la session atteint (${likesText(target, true)}).`);
+      if (this.dryLikes >= quota) throw new Stop('paused', `Quota du jour atteint (${likesText(quota, true)}).`);
       return;
     }
     const c = await this.p.store.likeCounts(this.ctx.sessionId, this.p.clock.now());
-    const pending = this.pending.story + this.pending.post;
-    if (c.session + pending >= target) {
-      throw new Stop('paused', `Objectif de la session atteint (${likesText(target)}).`);
-    }
-    if (c.today + pending >= this.ctx.settings.maxLikesPerDay) {
-      throw new Stop('paused', `Plafond du jour atteint (${likesText(this.ctx.settings.maxLikesPerDay)}).`);
+    if (c.today + this.pending.story + this.pending.post >= quota) {
+      throw new Stop('paused', `Quota du jour atteint (${likesText(quota)}). Reprise possible demain.`);
     }
   }
 
@@ -761,7 +757,7 @@ export class Engine {
     this.catchUp = new Set();
     this.current = null;
     this.processedThisRun = 0;
-    this.likesBefore = 0;
+    this.todayBefore = 0;
     this.restDue = false;
   }
 
@@ -864,9 +860,9 @@ export class Engine {
       discovered: this.discovered,
       likes: { story: this.likes.story + this.pending.story, post: this.likes.post + this.pending.post },
       dryLikes: this.dryLikes,
-      sessionLikes: this.ctx.settings.dryRun
+      dayLikes: this.ctx.settings.dryRun
         ? this.dryLikes
-        : this.likesBefore + this.likes.story + this.pending.story + this.likes.post + this.pending.post,
+        : this.todayBefore + this.likes.story + this.pending.story + this.likes.post + this.pending.post,
       skippedCatchUp: this.catchUp.size,
       elapsedMs: this.elapsed(),
       flash,

@@ -129,8 +129,8 @@ export type Progress = {
   likes: { story: number; post: number };
   /** Likes the dry run would have made. */
   dryLikes: number;
-  /** Likes of the whole session (earlier runs included, simulated ones in dry run), against its target. */
-  sessionLikes: number;
+  /** Likes of the day, all sessions together (this run's simulated ones in dry run), against the daily quota. */
+  dayLikes: number;
   skippedCatchUp: number;
   elapsedMs: number;
   flash?: string;

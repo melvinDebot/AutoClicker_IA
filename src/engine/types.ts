@@ -62,8 +62,10 @@ export type Settings = {
   autoStopMin: AutoStop;
   dryRun: boolean;
   pace: Pace;
-  /** Likes to send in the session: it stops as soon as they are sent (simulated ones count in dry run). */
-  maxLikesPerSession: number;
+  /**
+   * Daily quota, all sessions together: a run goes on until today's likes reach it, whatever the
+   * number of sessions (in dry run, the simulated likes of the run count instead).
+   */
   maxLikesPerDay: number;
 };
 
@@ -71,9 +73,9 @@ export const DEFAULT_SETTINGS: Settings = {
   likeStory: true,
   storyIfNoPosts: true,
   postsPerUser: 2,
-  autoStopMin: 30,
+  // The daily quota already ends every run.
+  autoStopMin: 0,
   dryRun: true,
   pace: 'slow',
-  maxLikesPerSession: 20,
-  maxLikesPerDay: 60,
+  maxLikesPerDay: 40,
 };
