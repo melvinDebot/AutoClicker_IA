@@ -199,19 +199,110 @@ Le repérage s'arrête (pause « élément introuvable ») au lieu de toucher au
 
 ---
 
-## 🚢 Publier sur Expo — EAS Update
+## 🚢 Build et publication (Expo / EAS)
 
-Compte `verseapp`, runtime `exposdk:58.0.0` :
+Projet Expo du compte `verseapp` (`projectId` dans `app.json`), bundle `dev.mdebot.autoclicker`, runtime `exposdk:58.0.0`. Les profils sont dans [`eas.json`](eas.json) :
+
+| Profil | Contenu | Distribution | Canal |
+| --- | --- | --- | --- |
+| `development` | Dev client (charge le JS depuis Metro) | Interne, iPhone réel | `development` |
+| `preview` | App autonome (JS embarqué) | Interne, iPhone réel | `preview` |
+
+### 0. Installation & connexion (une seule fois)
+
+```bash
+npm install --global eas-cli
+```
+
+```bash
+eas login
+```
+
+```bash
+eas whoami
+```
+
+### 1. Expo Go (le plus rapide, sans build)
+
+Ouvrir le projet directement dans l'app **[Expo Go](https://expo.dev/go)**, en forçant Expo Go à la place du dev client :
+
+```bash
+npx expo start --go
+```
+
+Scanner le QR code avec l'appareil photo de l'iPhone (même Wi-Fi que le Mac). Ou, sans Mac allumé, publier une mise à jour sur EAS et l'ouvrir dans Expo Go depuis le tableau de bord :
 
 ```bash
 npx eas-cli@latest update --branch preview --environment preview --platform ios --message "…"
 ```
 
-La mise à jour s'ouvre dans **Expo Go** avec le QR code du tableau de bord EAS, ou le lien `exp://u.expo.dev/<projectId>/group/<groupId>`.
+Le lien de la mise à jour a la forme `exp://u.expo.dev/<projectId>/group/<groupId>`.
 
-> ℹ️ Dans Expo Go, le module natif `vision-check` n'existe pas : l'app reste en **essai à blanc** (pas de confirmation sur capture, donc aucun vrai like). Les vrais likes demandent le dev build ou un build EAS.
+> ℹ️ Dans Expo Go, le module natif `vision-check` n'existe pas : l'app reste en **essai à blanc** (pas de confirmation sur capture, donc aucun vrai like). Les vrais likes demandent un dev build ou un build EAS.
 
-> 📚 Références : [Development builds](https://docs.expo.dev/develop/development-builds/introduction/) · [EAS Update](https://docs.expo.dev/eas-update/introduction/)
+### 2. Build local (Xcode sur le Mac)
+
+```bash
+npx expo run:ios --device
+```
+
+```bash
+npx expo run:ios
+```
+
+La première commande installe sur l'iPhone branché, la seconde sur le simulateur. À lancer dans la copie de build APFS (voir « Où vit le projet »).
+
+### 3. Build dans le cloud — EAS Build
+
+La distribution interne iOS installe l'app sur des iPhone enregistrés (profil *ad hoc*) : il faut un compte **Apple Developer payant** (l'équipe personnelle gratuite ne suffit pas) et enregistrer l'iPhone une fois :
+
+```bash
+eas device:create
+```
+
+Dev client (remplace `npx expo run:ios --device`, puis `npm start` pour le JS) :
+
+```bash
+eas build --profile development --platform ios
+```
+
+App autonome à installer sur l'iPhone, qui reçoit les mises à jour du canal `preview` :
+
+```bash
+eas build --profile preview --platform ios
+```
+
+Même build, compilé sur le Mac plutôt que dans le cloud (Xcode et CocoaPods requis) :
+
+```bash
+eas build --profile preview --platform ios --local
+```
+
+EAS gère les **certificats et profils de signature** au premier build (questions interactives). Une fois le build fini, l'installer depuis le lien ou le QR code affiché par EAS, ou :
+
+```bash
+eas build:run --platform ios --latest
+```
+
+```bash
+eas build:list --platform ios
+```
+
+### 4. Mises à jour OTA — EAS Update
+
+Pousser du JS et des assets sans recompiler, vers les builds du même canal et du même runtime :
+
+```bash
+eas update --branch preview --environment preview --platform ios --message "…"
+```
+
+```bash
+eas update --branch development --platform ios --message "…"
+```
+
+Une modif native (module `vision-check`, nouvelle dépendance native, `app.json`) demande un nouveau build, pas une mise à jour.
+
+> 📚 Références : [Expo Go](https://docs.expo.dev/get-started/expo-go/) · [Development builds](https://docs.expo.dev/develop/development-builds/introduction/) · [EAS Build](https://docs.expo.dev/build/introduction/) · [Distribution interne](https://docs.expo.dev/build/internal-distribution/) · [EAS Update](https://docs.expo.dev/eas-update/introduction/)
 
 ---
 
