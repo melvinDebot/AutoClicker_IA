@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import { dayKey } from '@/engine/stats';
+import { forgetSessionInICloud } from '../cloudBackup';
 import { db } from './db';
 import { dailyCounters, events, sessions, sessionUsers } from './schema';
 
@@ -47,9 +48,10 @@ export const handledUsersQuery = (sessionId: string) =>
 
 export async function deleteSession(id: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.id, id));
+  forgetSessionInICloud(id);
 }
 
-/** "Tout effacer": every table. WebView data is cleared separately (native module). */
+/** "Tout effacer": every table. WebView data and the iCloud copy are cleared separately. */
 export async function wipeAllData(): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.delete(events);

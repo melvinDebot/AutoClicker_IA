@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { clearICloud, restoreFromICloud, setCloudEnabled, useCloudState } from '@/adapters/cloudBackup';
 import { resetSettings, updateSettings, useSettings } from '@/adapters/settings';
 import { seedDemoSessions } from '@/adapters/store/demoData';
 import { likesToday, wipeAllData } from '@/adapters/store/repo';
@@ -45,6 +46,86 @@ const STATUS_LOOK: Record<SettingsStatus['level'], { icon: IconName; color: stri
   risky: { icon: 'alert', color: colors.warning, bg: 'rgba(245,184,61,0.10)', border: 'rgba(245,184,61,0.35)' },
   blocked: { icon: 'alert', color: colors.dangerText, bg: 'rgba(255,90,110,0.10)', border: 'rgba(255,90,110,0.25)' },
 };
+
+/** iCloud backup: the sessions in progress come back after a reinstall or on another iPhone. */
+function CloudBlock() {
+  const c = useCloudState();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  if (!c.available) {
+    return (
+      <SettingBlock>
+        <SettingHeader
+          icon="refresh"
+          tone="teal"
+          title="Sauvegarde iCloud"
+          description="Absente de cette version (Expo Go, ou dev build fait avant elle) : reconstruire le dev build pour l’activer."
+        />
+      </SettingBlock>
+    );
+  }
+
+  const toggle = (on: boolean) => {
+    if (on) {
+      setCloudEnabled(true)
+        .then(() => toast('Sauvegarde iCloud activée'))
+        .catch((e: unknown) => Alert.alert('Sauvegarde iCloud', e instanceof Error ? e.message : String(e)));
+      return;
+    }
+    Alert.alert(
+      'Désactiver la sauvegarde iCloud ?',
+      'La copie de vos sessions sur votre compte Apple sera supprimée. Les données de cet iPhone ne changent pas.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Désactiver',
+          style: 'destructive',
+          onPress: () => setCloudEnabled(false).catch((e: unknown) => Alert.alert('Sauvegarde iCloud', String(e))),
+        },
+      ],
+    );
+  };
+
+  const restore = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const n = await restoreFromICloud();
+      toast(n === 0 ? 'Rien de plus récent dans iCloud' : `${n} session${n > 1 ? 's' : ''} récupérée${n > 1 ? 's' : ''}`);
+    } catch (e) {
+      Alert.alert('Restauration impossible', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingBlock>
+      <SwitchRow
+        icon="refresh"
+        tone="teal"
+        title="Sauvegarde iCloud"
+        description="Sessions et progression, réglages, likes du jour et dernier avertissement d’Instagram, sur votre compte Apple. Après une réinstallation ou sur un autre iPhone connecté au même compte, les sessions en cours reviennent et se reprennent."
+        value={c.enabled}
+        onChange={toggle}
+      />
+      {c.enabled ? (
+        <>
+          <InfoRow label="Compte iCloud" value={c.signedIn ? 'Connecté' : 'Non détecté sur cet iPhone'} />
+          <InfoRow label="Dernière sauvegarde" value={c.lastBackupAt ? formatDateTime(c.lastBackupAt) : '—'} />
+          <InfoRow label="Sessions sauvegardées" value={c.left > 0 ? `${c.saved} (${c.left} anciennes laissées de côté)` : String(c.saved)} />
+          {c.error ? (
+            <Text size={13} color={colors.warning} style={styles.lh}>
+              {c.error}
+            </Text>
+          ) : null}
+          <Button label={busy ? 'Restauration…' : 'Restaurer depuis iCloud'} variant="dark" size="sm" icon="refresh" onPress={restore} />
+        </>
+      ) : null}
+    </SettingBlock>
+  );
+}
 
 /** Verdict on the settings, at the top: likes per day and pace, prudent or risky. */
 function StatusCard({ status, dryRun }: { status: SettingsStatus; dryRun: boolean }) {
@@ -93,7 +174,7 @@ export default function SettingsScreen() {
   const confirmWipe = () =>
     Alert.alert(
       'Tout effacer ?',
-      'Sessions, progression, compteurs, réglages et données de la WebView (dont votre connexion Instagram) seront supprimés de cet iPhone.',
+      'Sessions, progression, compteurs, réglages et données de la WebView (dont votre connexion Instagram) seront supprimés de cet iPhone, ainsi que la sauvegarde iCloud.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -102,6 +183,7 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await wipeAllData();
+              await clearICloud();
               resetSettings();
               if (VisionCheckNative.isAvailable()) {
                 await VisionCheckNative.releaseAll();
@@ -246,11 +328,15 @@ export default function SettingsScreen() {
           <InfoRow label="Version des gabarits" value={TEMPLATES_VERSION} />
         </SettingBlock>
 
+        <SectionHeader title="Compte Apple" />
+        <CloudBlock />
+
         <SectionHeader title="Données" />
         <SettingBlock>
           <Text size={13} color={colors.textMuted} style={styles.lh}>
-            Tout reste sur cet iPhone : aucune capture ni donnée n’est envoyée à un serveur. Pour vous déconnecter
-            d’Instagram, utilisez le menu d’Instagram dans la WebView.
+            Aucune capture ne quitte cet iPhone. Seule la sauvegarde iCloud, si elle est activée, copie les sessions
+            sur votre compte Apple ; rien n’est envoyé à un autre serveur. La connexion Instagram n’est pas
+            sauvegardée : après une réinstallation, reconnectez-vous dans la WebView.
           </Text>
           <Button label="Tout effacer" variant="danger" size="sm" icon="trash" onPress={confirmWipe} />
         </SettingBlock>

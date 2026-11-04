@@ -40,6 +40,19 @@ Réglages : likes par jour à **5** (ou directement dans le récap) et au plus 2
 | 19 | Quota atteint | Pause « Quota du jour atteint (5 likes). Reprise possible demain. », sans ouvrir de profil de plus ; un nouveau lancement le même jour est refusé dans le récap | ☐ |
 | 20 | Réglages → Likes aujourd'hui | Compteur à jour | ☐ |
 
+## 4. Sauvegarde iCloud
+
+Sur l'iPhone, connecté à iCloud (Réglages iOS › votre nom), avec un dev build fait après l'ajout du module `icloud-kv`.
+
+| # | Action | Attendu | OK |
+|---|---|---|---|
+| 21 | Réglages › Compte Apple | « Sauvegarde iCloud » activée, « Compte iCloud : Connecté », « Dernière sauvegarde » à l'heure du lancement | ☐ |
+| 22 | Lancer un essai à blanc, le mettre en pause | Quelques secondes après, « Dernière sauvegarde » change, « Sessions sauvegardées » compte la session | ☐ |
+| 23 | Supprimer l'app, la réinstaller (dev build), l'ouvrir, attendre jusqu'à une minute | La session revient dans Sessions avec sa progression ; Réglages reprend les valeurs, essai à blanc activé | ☐ |
+| 24 | Se reconnecter à Instagram, rouvrir la liste d'abonnés du même compte → Lancer | Reprise proposée ; les comptes déjà traités sont sautés | ☐ |
+| 25 | Supprimer une session, réinstaller | Elle ne revient pas | ☐ |
+| 26 | Désactiver l'interrupteur → Désactiver | Copie iCloud vidée ; après réinstallation, rien ne revient | ☐ |
+
 ## Sur le simulateur, sans Instagram
 
 Une copie locale des pages d'Instagram (liste, profils publics, privés, sans post, stories, posts) permet d'essayer le moteur, l'overlay et le rythme sans toucher au compte :

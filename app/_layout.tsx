@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import migrations from '../drizzle/migrations';
 import { db } from '@/adapters/store/db';
+import { startCloudBackup } from '@/adapters/cloudBackup';
 import { markRunningAsInterrupted } from '@/adapters/store/sessionStore';
 import { Text, ToastProvider } from '@/ui/components';
 import { colors } from '@/ui/theme';
@@ -32,8 +33,9 @@ export default function RootLayout() {
   const { success, error } = useMigrations(db, migrations);
 
   // A session still "running" at launch: the app was closed or killed during a run.
+  // Then the iCloud copy: sessions missing here (reinstall, new iPhone) come back as resumable.
   useEffect(() => {
-    if (success) markRunningAsInterrupted().catch(() => {});
+    if (success) markRunningAsInterrupted().catch(() => {}).finally(startCloudBackup);
   }, [success]);
 
   if (error) {

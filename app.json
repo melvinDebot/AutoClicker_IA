@@ -17,7 +17,10 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "appleTeamId": "6K8773H6XD"
+      "appleTeamId": "6K8773H6XD",
+      "entitlements": {
+        "com.apple.developer.ubiquity-kvstore-identifier": "$(TeamIdentifierPrefix)$(CFBundleIdentifier)"
+      }
     },
     "plugins": [
       "expo-router",

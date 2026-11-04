@@ -18,17 +18,22 @@ export function updateSettings(patch: Partial<Settings>): void {
   listeners.forEach((l) => l());
 }
 
+/** False until the settings are changed once on this iPhone (fresh install: iCloud ones may be restored). */
+export function hasStoredSettings(): boolean {
+  return Storage.getItemSync(KEY) !== null;
+}
+
 export function resetSettings(): void {
   Storage.removeItemSync(KEY);
   cache = parseSettings(null);
   listeners.forEach((l) => l());
 }
 
-function subscribe(l: () => void) {
+export function onSettingsChange(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
 }
 
 export function useSettings(): Settings {
-  return useSyncExternalStore(subscribe, getSettings, getSettings);
+  return useSyncExternalStore(onSettingsChange, getSettings, getSettings);
 }

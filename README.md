@@ -43,6 +43,7 @@ L'**essai à blanc** est activé par défaut : l'app fait tout le parcours sans 
 | Moteur (parcours, essai à blanc, quota, reprise, arrêts) | 🟡 Testé avec un faux Instagram (Jest), **pas encore sur iPhone** |
 | Scan, récap, compte à rebours, mode verrouillé, résumé | 🟡 Écrit, **pas encore essayé sur iPhone** |
 | Dataset de captures + règles de textes OCR | ✅ Fait, testé sur les captures |
+| Sauvegarde iCloud (module `icloud-kv`) | 🟡 Testée avec Jest (format, fusion), **pas encore sur iPhone** |
 | Notification « session en pause » | ⚪ Non faite (optionnelle ; `expo-notifications` retiré pour éviter l'autorisation push) |
 
 ## 🚀 Fonctionnalités
@@ -54,6 +55,7 @@ L'**essai à blanc** est activé par défaut : l'app fait tout le parcours sans 
 - 🛑 **Arrêt immédiat** sur « Réessayez plus tard », puis 48 h sans vrai like.
 - 🔒 **Écran verrouillé** pendant l'exécution, avec HUD (compte, étape, chrono) et compte à rebours annulable.
 - 💾 **Sessions persistées** (SQLite) et reprise d'une session interrompue.
+- ☁️ **Sauvegarde iCloud** sur le compte Apple : les sessions en cours reviennent après une réinstallation ou sur un autre iPhone.
 - 🟢 **Carte d'état des réglages** : prudents, risqués, ou en pause après un avertissement.
 
 ## 🧱 Stack technique
@@ -169,6 +171,7 @@ AutoClicker_IA/
 │   ├── adapters/          # store (Drizzle + expo-sqlite), settings (kv-store), webview (RPC postMessage)
 │   └── ui/                # thème, composants, Accueil (WebView), exécution, debug DOM
 ├── modules/vision-check/  # module Expo en Swift (snapshot WKWebView, OCR, couleurs, empreintes)
+├── modules/icloud-kv/     # module Expo en Swift (stockage clé-valeur iCloud, sauvegarde des sessions)
 ├── drizzle/               # migrations générées (npm run db:generate)
 ├── fixtures/screens/      # dataset de captures annotées, hors git (voir son README)
 ├── assets/templates/      # gabarits d'icônes + templates.json
@@ -186,6 +189,29 @@ AutoClicker_IA/
 ### 🛡️ Garde-fous
 
 Appliqués dans le code dès l'étape 1 : aucun user-agent modifié, aucun script global injecté, injection à la demande uniquement hors des pages de connexion et de compte (`src/recognition/url.ts`, testé), liens vers l'app Instagram bloqués, captures temporaires supprimées après usage, « Tout effacer » vide aussi les cookies de la WebView.
+
+## ☁️ Sauvegarde iCloud (compte Apple)
+
+Les sessions (comptes déjà traités et progression), les réglages, les likes des derniers jours et le dernier avertissement d'Instagram sont copiés dans le **stockage clé-valeur iCloud** (`NSUbiquitousKeyValueStore`) du compte Apple connecté à l'iPhone. Après une réinstallation, ou sur un autre iPhone avec le même compte Apple, l'app les récupère au lancement : une session en cours se reprend là où elle s'était arrêtée.
+
+- **Automatique** : une sauvegarde 5 s après chaque changement (et quand l'app passe en arrière-plan), une restauration au lancement et quand iCloud apporte du nouveau. Réglages › Compte Apple : interrupteur, état, « Restaurer depuis iCloud ».
+- **Ce qui revient** : une session qui tournait revient « interrompue » (reprise possible) ; les réglages reviennent avec l'**essai à blanc activé** ; le quota du jour et les 48 h après un avertissement suivent le compte, pas l'installation.
+- **Ce qui ne revient pas** : la connexion Instagram (cookies de la WebView), les captures et le journal détaillé des évènements.
+- **Place** : 1 Mo pour l'app. Les sessions en cours passent en premier, puis les terminées les plus récentes ; les plus anciennes sont laissées de côté (Réglages l'indique).
+- **Effacer** : supprimer une session la supprime aussi d'iCloud ; « Tout effacer » et la désactivation de l'interrupteur vident la copie iCloud.
+- **Code** : format et fusion dans `src/engine/backup.ts` (testé), synchro SQLite ↔ iCloud dans `src/adapters/cloudBackup.ts`, module natif `modules/icloud-kv`.
+
+**Prérequis** : compte Apple Developer payant (la capacité iCloud n'existe pas pour une équipe gratuite) et l'entitlement `com.apple.developer.ubiquity-kvstore-identifier` déclaré dans `app.json` (`ios.entitlements`). Il faut **régénérer le projet natif et refaire le dev build** pour l'avoir ; la signature automatique d'Xcode (ou EAS) ajoute la capacité iCloud à l'App ID :
+
+```bash
+npx expo prebuild --platform ios
+```
+
+```bash
+npx expo run:ios --device
+```
+
+Dans Expo Go, le module n'existe pas : Réglages indique que la sauvegarde est absente.
 
 ## 🔧 Quand Instagram change son interface
 
