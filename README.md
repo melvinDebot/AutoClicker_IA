@@ -314,7 +314,23 @@ eas build:run --platform ios --latest
 eas build:list --platform ios
 ```
 
-### 4. Mises à jour OTA — EAS Update
+### 4. TestFlight (archive locale, envoi avec le compte Xcode)
+
+App **AutoClicker IA** dans App Store Connect (identifiant `6830561602`, bundle `dev.mdebot.autoclicker`), groupe de test **interne** « Interne » avec distribution automatique : pas de vérification d'Apple, le build arrive dans l'app TestFlight une fois traité (5 à 30 min). Pas de test externe : il demanderait la vérification bêta d'Apple.
+
+À faire dans la copie de build APFS (DerivedData et fichiers temporaires sur l'image, le disque interne est presque plein). Avant chaque nouvel envoi, augmenter `ios.buildNumber` (ou `version`) dans `app.json`, puis `npx expo prebuild --platform ios` : Apple refuse deux builds avec le même numéro.
+
+```bash
+cd /Volumes/autoClicker/autoclicker && TMPDIR=/Volumes/autoClicker/tmp xcodebuild -workspace ios/AutoClicker.xcworkspace -scheme AutoClicker -configuration Release -destination 'generic/platform=iOS' -archivePath /Volumes/autoClicker/build/AutoClicker.xcarchive -derivedDataPath /Volumes/autoClicker/DerivedData -allowProvisioningUpdates archive
+```
+
+```bash
+cd /Volumes/autoClicker/build && TMPDIR=/Volumes/autoClicker/tmp xcodebuild -exportArchive -archivePath AutoClicker.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath export -allowProvisioningUpdates
+```
+
+`ExportOptions.plist` (dans `/Volumes/autoClicker/build/`) : `method` `app-store-connect`, `destination` `upload`, `teamID` `6K8773H6XD`, `signingStyle` `automatic`, `testFlightInternalTestingOnly` `true`. Le build TestFlight embarque le JavaScript (pas besoin de Metro) et fait de vrais likes : les garde-fous (essai à blanc par défaut, quota, 48 h) s'appliquent.
+
+### 5. Mises à jour OTA — EAS Update
 
 Pousser du JS et des assets sans recompiler, vers les builds du même canal et du même runtime :
 
